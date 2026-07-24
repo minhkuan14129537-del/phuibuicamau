@@ -15,11 +15,24 @@ const state = {
   tempExistingImages: [] // existing images kept when editing [{url}]
 };
 
+function checkFirebaseRulesWarning(error) {
+  if (error && (error.code === 'permission-denied' || (error.message && error.message.toLowerCase().includes('permission')))) {
+    let warnBanner = document.getElementById('firebase-warning-banner');
+    if (!warnBanner) {
+      warnBanner = document.createElement('div');
+      warnBanner.id = 'firebase-warning-banner';
+      warnBanner.style.cssText = 'background: #FFF3CD; color: #856404; padding: 14px 20px; border-bottom: 2px solid #FFEEBA; text-align: center; font-size: 0.9rem; font-weight: 600; position: sticky; top: 0; z-index: 9999; box-shadow: 0 2px 8px rgba(0,0,0,0.1);';
+      document.body.prepend(warnBanner);
+    }
+    warnBanner.innerHTML = `⚠️ <b>FIREBASE CHƯA CẤP QUYỀN GHI CLOUD (Dự án pb-camau):</b> Đang dùng dữ liệu lưu tạm trên máy. Cần vào <a href="https://console.firebase.google.com/" target="_blank" style="color: #856404; text-decoration: underline;">Firebase Console</a> &gt; <b>Firestore Database</b> &gt; <b>Rules</b> &gt; sửa thành <code>allow read, write: if true;</code> rồi bấm <b>Publish</b>.`;
+  }
+}
+
 // Initialize app data from Firebase Cloud (V2 collections) or LocalStorage fallback (pb_v2_* keys)
 async function initData() {
   if (window.db) {
     try {
-      console.log("Syncing V2 database with Firebase Firestore Cloud...");
+      console.log("Syncing V2 database with Firebase Firestore Cloud (pb-camau)...");
       
       // 0. Load Store Info Branding
       try {
@@ -32,6 +45,7 @@ async function initData() {
         }
       } catch (e) {
         console.error("Error loading store info from Firebase V2:", e);
+        checkFirebaseRulesWarning(e);
         state.storeInfo = window.DEFAULT_STORE_INFO || {};
       }
       saveState('pb_v2_store_info', state.storeInfo);
@@ -67,6 +81,7 @@ async function initData() {
       
     } catch (error) {
       console.error("Firebase V2 sync failed, falling back to LocalStorage:", error);
+      checkFirebaseRulesWarning(error);
       loadFromLocalStorage();
     }
   } else {
@@ -348,12 +363,16 @@ async function handleStoreSettingsSubmit(e) {
 
   saveState('pb_v2_store_info', state.storeInfo);
 
+  let cloudSynced = false;
   if (window.db) {
     try {
       await window.db.collection('v2_store_info').doc('main').set(state.storeInfo);
       console.log("Synced store info to Firebase V2.");
+      cloudSynced = true;
     } catch (err) {
       console.error("Error syncing store info to Firebase V2:", err);
+      checkFirebaseRulesWarning(err);
+      alert(`⚠️ CẢNH BÁO FIREBASE RULES (Dự án pb-camau):\n\nKhông thể lưu lên Cloud Firebase do chưa mở quyền ghi (Rules).\n\nChi tiết lỗi: ${err.message}\n\nHướng dẫn bật quyền ghi trên Firebase:\n1. Mở Firebase Console -> Dự án 'pb-camau'\n2. Chọn Firestore Database -> tab Rules\n3. Đổi thành: allow read, write: if true; và bấm Publish!`);
     }
   }
 
@@ -362,10 +381,13 @@ async function handleStoreSettingsSubmit(e) {
   const msg = document.getElementById('store-settings-msg');
   if (msg) {
     msg.style.display = 'inline';
-    setTimeout(() => { msg.style.display = 'none'; }, 3500);
+    msg.textContent = cloudSynced ? '✓ Đã lưu & đồng bộ Cloud Firebase thành công!' : '⚠️ Đã lưu tạm trên máy (chưa đẩy được lên Cloud Firebase)!';
+    setTimeout(() => { msg.style.display = 'none'; }, 4000);
   }
 
-  alert('Cập nhật thông tin cửa hàng thành công!');
+  if (cloudSynced || !window.db) {
+    alert('Cập nhật thông tin cửa hàng thành công!');
+  }
 }
 
 // Update profile in sidebar
@@ -1597,9 +1619,9 @@ function drawRevenueTrendChart(filteredOrders) {
   const maxRevenue = Math.max(...dataPoints.map(d => Math.max(d.expected, d.realized)), 100000); // min 100k scale
 
   // Draw Grid Lines & Labels
-  ctx.strokeStyle = '#EADFD5';
+  ctx.strokeStyle = '#E2E8F0';
   ctx.lineWidth = 1;
-  ctx.fillStyle = '#706054';
+  ctx.fillStyle = '#64748B';
   ctx.font = '10px Montserrat';
   ctx.textAlign = 'right';
 
@@ -1629,8 +1651,8 @@ function drawRevenueTrendChart(filteredOrders) {
     }
   });
 
-  // 1. Plot expected line (dashed, muted)
-  ctx.strokeStyle = '#B8A89C'; // Muted grey/brown
+  // 1. Plot expected line (dashed, muted slate blue)
+  ctx.strokeStyle = '#94A3B8'; // Muted slate blue/gray
   ctx.lineWidth = 2;
   ctx.setLineDash([4, 4]); // dashed line for provisional/expected
   ctx.beginPath();
@@ -1651,8 +1673,8 @@ function drawRevenueTrendChart(filteredOrders) {
   ctx.stroke();
   ctx.setLineDash([]); // Reset dashed line style
 
-  // 2. Plot realized line (solid, gold)
-  ctx.strokeStyle = '#E89C19'; // Brand Gold
+  // 2. Plot realized line (solid, Ocean Blue)
+  ctx.strokeStyle = '#0284C7'; // Brand Ocean Blue
   ctx.lineWidth = 3;
   ctx.beginPath();
   
@@ -1673,8 +1695,8 @@ function drawRevenueTrendChart(filteredOrders) {
 
   // Draw area gradient for realized
   const gradient = ctx.createLinearGradient(0, padding, 0, height - padding);
-  gradient.addColorStop(0, 'rgba(232, 156, 25, 0.25)');
-  gradient.addColorStop(1, 'rgba(232, 156, 25, 0.0)');
+  gradient.addColorStop(0, 'rgba(2, 132, 199, 0.25)');
+  gradient.addColorStop(1, 'rgba(2, 132, 199, 0.0)');
   ctx.fillStyle = gradient;
   
   ctx.beginPath();
@@ -1688,7 +1710,7 @@ function drawRevenueTrendChart(filteredOrders) {
   if (pointsCount <= 12) {
     // Expected circles
     ctx.fillStyle = '#FFFFFF';
-    ctx.strokeStyle = '#B8A89C';
+    ctx.strokeStyle = '#94A3B8';
     ctx.lineWidth = 2;
     expectedPoints.forEach((pt) => {
       ctx.beginPath();
@@ -1698,8 +1720,8 @@ function drawRevenueTrendChart(filteredOrders) {
     });
 
     // Realized circles & labels
-    ctx.fillStyle = '#4A3728';
-    ctx.strokeStyle = '#E89C19';
+    ctx.fillStyle = '#0F172A';
+    ctx.strokeStyle = '#0284C7';
     ctx.lineWidth = 2;
 
     realizedPoints.forEach((pt, idx) => {
@@ -1709,7 +1731,7 @@ function drawRevenueTrendChart(filteredOrders) {
       ctx.stroke();
 
       if (dataPoints[idx].realized > 0) {
-        ctx.fillStyle = '#2C2018';
+        ctx.fillStyle = '#0F172A';
         ctx.font = 'bold 9px Montserrat';
         ctx.fillText(formatVND(dataPoints[idx].realized).replace('₫', '').trim(), pt.x, pt.y - 12);
       }
@@ -1745,7 +1767,7 @@ function drawPopularServicesChart(filteredOrders) {
     .slice(0, 5); // top 5
 
   if (popular.length === 0) {
-    ctx.fillStyle = '#9B8E85';
+    ctx.fillStyle = '#94A3B8';
     ctx.font = '14px Montserrat';
     ctx.textAlign = 'center';
     ctx.fillText('Chưa có dữ liệu dịch vụ', width / 2, height / 2);
@@ -1760,7 +1782,8 @@ function drawPopularServicesChart(filteredOrders) {
   let totalCount = popular.reduce((sum, item) => sum + item.count, 0);
   let startAngle = -Math.PI / 2;
 
-  const colors = ['#E89C19', '#4A3728', '#6E533F', '#A08068', '#C6A995'];
+  // Harmonious Blue/Teal Theme Palette
+  const colors = ['#0284C7', '#2563EB', '#0D9488', '#38BDF8', '#6366F1'];
 
   // Draw Slices
   popular.forEach((item, idx) => {
@@ -1797,7 +1820,7 @@ function drawPopularServicesChart(filteredOrders) {
     ctx.fillRect(x, legendYStart, 8, 8);
 
     // Label
-    ctx.fillStyle = '#2C2018';
+    ctx.fillStyle = '#334155';
     ctx.fillText(`${item.name.substring(0, 10)}... (${item.count})`, x + 14, legendYStart + 8);
   });
 }
