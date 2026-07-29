@@ -39,10 +39,44 @@ const DEFAULT_STORE_INFO = {
   receiptNote: 'Cảm ơn quý khách đã tin tưởng dịch vụ của chúng tôi!\nQuý khách vui lòng mang hóa đơn này khi nhận lại giày.'
 };
 
+const DEFAULT_EXPENSES = [
+  {
+    id: 'EXP-001',
+    date: '2026-07-05',
+    category: 'rent',
+    categoryName: '🏢 Mặt bằng / Cửa hàng',
+    amount: 5000000,
+    description: 'Thanh toán tiền thuê mặt bằng cửa hàng tháng 7/2026',
+    creator: 'Nguyễn Văn Admin',
+    createdAt: '2026-07-05T09:00:00.000Z'
+  },
+  {
+    id: 'EXP-002',
+    date: '2026-07-10',
+    category: 'utilities',
+    categoryName: '⚡ Điện, Nước & Internet',
+    amount: 1250000,
+    description: 'Tiền điện & nước tháng 6 phát sinh',
+    creator: 'Nguyễn Văn Admin',
+    createdAt: '2026-07-10T10:30:00.000Z'
+  },
+  {
+    id: 'EXP-003',
+    date: '2026-07-15',
+    category: 'supplies',
+    categoryName: '🧼 Dung dịch, Hóa chất & Vật tư Spa',
+    amount: 850000,
+    description: 'Nhập dung dịch giặt hấp hữu cơ sinh học & xi đánh bóng da',
+    creator: 'Nguyễn Văn Admin',
+    createdAt: '2026-07-15T14:20:00.000Z'
+  }
+];
+
 if (typeof window !== 'undefined') {
   window.DEFAULT_SERVICES = DEFAULT_SERVICES;
   window.DEFAULT_USERS = DEFAULT_USERS;
   window.BRAND_INFO = DEFAULT_STORE_INFO;
   window.DEFAULT_STORE_INFO = DEFAULT_STORE_INFO;
   window.INITIAL_ORDERS = INITIAL_ORDERS;
+  window.DEFAULT_EXPENSES = DEFAULT_EXPENSES;
 }

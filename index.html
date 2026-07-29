@@ -63,6 +63,12 @@
             Quản lý đơn hàng
           </a>
         </li>
+        <li data-view="expenses" class="admin-only">
+          <a>
+            <svg viewBox="0 0 24 24"><path d="M21 18v1c0 1.1-.9 2-2 2H5c-1.11 0-2-.9-2-2V5c0-1.1.89-2 2-2h14c1.1 0 2 .9 2 2v1h-9c-1.11 0-2 .9-2 2v8c0 1.1.89 2 2 2h9zm-9-2h10V8H12v8zm4-2.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z" fill="currentColor"/></svg>
+            Quản lý chi phí
+          </a>
+        </li>
         <li data-view="customers">
           <a>
             <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z" fill="currentColor"/></svg>
@@ -85,6 +91,12 @@
           <a>
             <svg viewBox="0 0 24 24"><path d="M19.43 12.98c.04-.32.07-.64.07-.98s-.03-.66-.07-.98l2.11-1.65c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.3-.61-.22l-2.49 1c-.52-.4-1.08-.73-1.69-.98l-.38-2.65C14.46 2.18 14.25 2 14 2h-4c-.25 0-.46.18-.49.42l-.38 2.65c-.61.25-1.17.59-1.69.98l-2.49-1c-.23-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64l2.11 1.65c-.04.32-.07.65-.07.98s.03.66.07.98l-2.11 1.65c-.19.15-.24.42-.12.64l2 3.46c.12.22.39.3.61.22l2.49-1c.52.4 1.08.73 1.69.98l.38 2.65c.03.24.24.42.49.42h4c.25 0 .46-.18.49-.42l.38-2.65c.61-.25 1.17-.59 1.69-.98l2.49 1c.23.09.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.65zM12 15.5c-1.93 0-3.5-1.57-3.5-3.5s1.57-3.5 3.5-3.5 3.5 1.57 3.5 3.5-1.57 3.5-3.5 3.5z" fill="currentColor"/></svg>
             Thông tin cửa hàng
+          </a>
+        </li>
+        <li data-view="content-studio">
+          <a>
+            <svg viewBox="0 0 24 24"><path d="M12 3c-4.97 0-9 4.03-9 9 0 2.12.74 4.07 1.97 5.61L4.35 21l3.56-.63C9.37 20.73 10.64 21 12 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 14h-2v-2h2v2zm0-4h-2V7h2v6z" fill="currentColor"/></svg>
+            Marketing
           </a>
         </li>
       </ul>
@@ -142,6 +154,11 @@
               <option value="2027">2027</option>
             </select>
             
+            <select id="db-filter-expense-mode" class="filter-select" style="padding: 8px 12px; font-weight: 600; color: var(--color-brand-brown-dark); border-color: var(--color-brand-gold);">
+              <option value="gross" selected>Doanh thu thực nhận: Chưa trừ chi phí</option>
+              <option value="net">Doanh thu thực nhận: Đã trừ chi phí</option>
+            </select>
+            
             <button class="btn btn-secondary btn-sm" id="btn-reset-db-filters">Đặt lại</button>
           </div>
         </div>
@@ -177,16 +194,25 @@
           </div>
           <div class="stat-card stat-revenue-expected">
             <div class="stat-info">
-              <h3>Doanh thu tạm tính</h3>
-              <div class="stat-value" id="stat-revenue-expected" style="font-size: 1.35rem;">0đ</div>
+              <h3>Doanh thu bán hàng (Gộp)</h3>
+              <div class="stat-value" id="stat-revenue-expected" style="font-size: 1.35rem; color: #3B82F6;">0đ</div>
             </div>
-            <div class="stat-icon">
-              <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
+            <div class="stat-icon" style="background-color: rgba(59, 130, 246, 0.15);">
+              <svg viewBox="0 0 24 24" fill="#3B82F6"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
+            </div>
+          </div>
+          <div class="stat-card stat-total-expenses">
+            <div class="stat-info">
+              <h3>Tổng chi phí kinh doanh</h3>
+              <div class="stat-value" id="stat-total-expenses" style="font-size: 1.35rem; color: #EF4444;">0đ</div>
+            </div>
+            <div class="stat-icon" style="background-color: rgba(239, 68, 68, 0.15);">
+              <svg viewBox="0 0 24 24" fill="#EF4444"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
             </div>
           </div>
           <div class="stat-card stat-revenue-realized">
             <div class="stat-info">
-              <h3>Doanh thu thực nhận</h3>
+              <h3 id="lbl-stat-revenue-realized">Doanh thu thực nhận</h3>
               <div class="stat-value" id="stat-revenue-realized" style="font-size: 1.35rem; color: var(--status-completed-text);">0đ</div>
             </div>
             <div class="stat-icon" style="background-color: var(--status-completed-bg);">
@@ -441,6 +467,27 @@
               <textarea id="store-receipt-note-input" class="form-control" rows="3" placeholder="Lời cảm ơn hoặc lưu ý in ở cuối hóa đơn..."></textarea>
             </div>
 
+            <!-- Facebook Fanpage Auto-Post Integration Settings -->
+            <div style="background: var(--color-brand-cream); padding: 16px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); margin-bottom: 24px;">
+              <h4 style="font-size: 0.95rem; font-weight: 700; color: var(--color-brand-brown-dark); margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+                <svg viewBox="0 0 24 24" style="width: 20px; height: 20px; fill: #1877F2;"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+                Cấu hình Đăng bài Tự Động lên Facebook Fanpage (Meta Graph API)
+              </h4>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                <div class="form-group" style="margin-bottom: 0;">
+                  <label for="store-fb-page-id">Facebook Page ID (ID Trang Fanpage)</label>
+                  <input type="text" id="store-fb-page-id" class="form-control" placeholder="Ví dụ: 102938475638291">
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                  <label for="store-fb-page-token">Page Access Token (Mã truy cập Page)</label>
+                  <input type="password" id="store-fb-page-token" class="form-control" placeholder="EAAxxxxxxx... (Dán Token truy cập tại đây)">
+                </div>
+              </div>
+              <small style="color: var(--text-secondary); display: block; margin-top: 8px;">
+                💡 <b>Hướng dẫn lấy Token:</b> Vào <a href="https://developers.facebook.com/" target="_blank" style="color: var(--color-brand-gold); text-decoration: underline;">developers.facebook.com</a> &gt; Graph API Explorer &gt; Chọn Fanpage của bạn &gt; Cấp quyền <code>pages_manage_posts</code> &gt; Copy Page Access Token.
+              </small>
+            </div>
+
             <div style="display: flex; gap: 12px; align-items: center;">
               <button type="submit" class="btn btn-primary" style="padding: 12px 32px; font-weight: 700;">
                 💾 LƯU CẤU HÌNH CỬA HÀNG
@@ -448,6 +495,403 @@
               <span id="store-settings-msg" style="color: var(--status-completed-text); font-weight: 600; display: none;">✓ Đã lưu cấu hình cửa hàng thành công!</span>
             </div>
           </form>
+        </div>
+      </section>
+
+      <!-- ================= VIEW: CONTENT STUDIO ================= -->
+      <section id="view-content-studio" class="view-section">
+        <div class="top-bar">
+          <div class="page-title">
+            <h2>Marketing & Sáng Tạo Content</h2>
+            <p>Tạo bài viết và thiết kế ảnh quảng cáo chuyên nghiệp đăng Facebook, Zalo, Instagram từ đơn hàng hoặc ảnh tự chọn</p>
+          </div>
+        </div>
+
+        <div class="content-studio-container">
+          <!-- LEFT COLUMN: INPUTS & TEXT GENERATOR -->
+          <div class="studio-col input-text-col">
+            <div class="data-card studio-card">
+              <h3 class="studio-card-title">
+                <svg viewBox="0 0 24 24" style="width:20px;height:20px;fill:var(--color-brand-gold);"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
+                1. Nguồn Dữ Liệu & Thông Tin
+              </h3>
+
+              <!-- Source Toggle Tabs -->
+              <div class="source-toggle-group">
+                <button type="button" class="source-tab-btn active" id="tab-src-order" onclick="switchContentSource('order')">📦 Từ đơn hàng có sẵn</button>
+                <button type="button" class="source-tab-btn" id="tab-src-custom" onclick="switchContentSource('custom')">🖼️ Tự chọn ảnh & Nhập thủ công</button>
+              </div>
+
+              <!-- Section: Order Selector -->
+              <div id="studio-src-order-block" class="studio-src-block">
+                <div class="form-group">
+                  <label for="studio-order-select">Chọn đơn hàng *</label>
+                  <select id="studio-order-select" class="form-control" onchange="onStudioOrderSelect(this.value)">
+                    <option value="">-- Chọn một đơn hàng --</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Section: Custom Image Upload (2 Slots: BEFORE & AFTER) -->
+              <div id="studio-src-custom-block" class="studio-src-block" style="display: none;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
+                  
+                  <!-- Slot 1: Ảnh TRƯỚC khi giặt (BEFORE) -->
+                  <div class="form-group" style="margin-bottom: 0;">
+                    <label style="font-weight: 700; color: #DC2626; display: flex; align-items: center; gap: 4px; font-size: 0.85rem;">
+                      📸 1. Ảnh TRƯỚC khi giặt (BEFORE)
+                    </label>
+                    <div class="image-upload-wrapper" id="studio-before-upload-box" onclick="document.getElementById('studio-before-image-input').click()" style="min-height: 130px; padding: 8px;">
+                      <div id="studio-before-preview-box" style="text-align: center; width: 100%;">
+                        <svg viewBox="0 0 24 24" style="width:32px;height:32px;fill:#DC2626;margin-bottom:4px;"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
+                        <p style="font-size: 0.8rem; margin: 0; font-weight: 600; color: var(--text-secondary);">Bấm chọn ảnh TRƯỚC giặt</p>
+                      </div>
+                    </div>
+                    <input type="file" id="studio-before-image-input" accept="image/*" style="display: none;" onchange="handleStudioBeforeImage(event)">
+                  </div>
+
+                  <!-- Slot 2: Ảnh SAU khi giặt (AFTER) -->
+                  <div class="form-group" style="margin-bottom: 0;">
+                    <label style="font-weight: 700; color: #16A34A; display: flex; align-items: center; gap: 4px; font-size: 0.85rem;">
+                      ✨ 2. Ảnh SAU khi giặt (AFTER)
+                    </label>
+                    <div class="image-upload-wrapper" id="studio-after-upload-box" onclick="document.getElementById('studio-after-image-input').click()" style="min-height: 130px; padding: 8px;">
+                      <div id="studio-after-preview-box" style="text-align: center; width: 100%;">
+                        <svg viewBox="0 0 24 24" style="width:32px;height:32px;fill:#16A34A;margin-bottom:4px;"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
+                        <p style="font-size: 0.8rem; margin: 0; font-weight: 600; color: var(--text-secondary);">Bấm chọn ảnh SAU giặt</p>
+                      </div>
+                    </div>
+                    <input type="file" id="studio-after-image-input" accept="image/*" style="display: none;" onchange="handleStudioAfterImage(event)">
+                  </div>
+
+                </div>
+              </div>
+
+              <!-- Section: Custom Single Promo Image Upload -->
+              <div id="studio-src-promo-block" class="studio-src-block" style="display: none;">
+                <div class="form-group" style="margin-bottom: 16px;">
+                  <label style="font-weight: 700; color: #EAB308; display: flex; align-items: center; gap: 4px; font-size: 0.85rem;">
+                    🔥 Tải 1 Ảnh Sản Phẩm / Banner Khuyến Mãi
+                  </label>
+                  <div class="image-upload-wrapper" id="studio-promo-upload-box" onclick="document.getElementById('studio-promo-image-input').click()" style="min-height: 130px; padding: 8px;">
+                    <div id="studio-promo-preview-box" style="text-align: center; width: 100%;">
+                      <svg viewBox="0 0 24 24" style="width:36px;height:36px;fill:#EAB308;margin-bottom:4px;"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
+                      <p style="font-size: 0.8rem; margin: 0; font-weight: 600; color: var(--text-secondary);">Bấm để chọn 1 ảnh sản phẩm / Banner khuyến mãi</p>
+                    </div>
+                  </div>
+                  <input type="file" id="studio-promo-image-input" accept="image/*" style="display: none;" onchange="handleStudioPromoImage(event)">
+                </div>
+              </div>
+
+              <!-- Image Thumbnails Grid -->
+              <div class="form-group">
+                <label>Ảnh sử dụng tạo bài viết & canvas</label>
+                <div class="image-preview-grid" id="studio-images-preview">
+                  <div style="color: var(--text-light); font-size: 0.85rem; font-style: italic;">Chưa có ảnh nào được chọn.</div>
+                </div>
+              </div>
+
+              <!-- Container: Quick Tips Preset Buttons (Shown in Tips mode) -->
+              <div id="studio-quick-tips-container" style="display: none; background: rgba(245, 158, 11, 0.08); padding: 12px; border-radius: var(--radius-sm); border: 1px solid rgba(245, 158, 11, 0.3); margin-bottom: 16px;">
+                <label style="font-weight: 700; color: #F59E0B; display: flex; align-items: center; gap: 4px; font-size: 0.85rem; margin-bottom: 8px;">
+                  💡 Bấm chọn 1 Mẹo Vặt Mẫu (Tự động sinh toàn bộ Nội dung & Ảnh Infographic):
+                </label>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                  <button type="button" class="preset-pill active" onclick="applyQuickShoeTip('yellow_sole', this)">🍋 Tẩy ố vàng đế</button>
+                  <button type="button" class="preset-pill" onclick="applyQuickShoeTip('odor_remove', this)">🍃 Khử mùi hôi cấp tốc</button>
+                  <button type="button" class="preset-pill" onclick="applyQuickShoeTip('suede_care', this)">🧼 Vệ sinh da lộn (Suede)</button>
+                  <button type="button" class="preset-pill" onclick="applyQuickShoeTip('rain_waterproof', this)">☔ Xử lý giày ướt mưa</button>
+                  <button type="button" class="preset-pill" onclick="applyQuickShoeTip('scuff_mark', this)">⚪ Tẩy vết xước da trắng</button>
+                </div>
+              </div>
+
+              <!-- Shoe & Service details inputs -->
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                <div class="form-group">
+                  <label id="lbl-studio-shoe-info" for="studio-shoe-info">Tên / Hiệu / Model Giày</label>
+                  <input type="text" id="studio-shoe-info" class="form-control" placeholder="Ví dụ: Nike Air Jordan 1 High" oninput="generateFanpageCaption(); renderContentCanvas();">
+                </div>
+                <div class="form-group">
+                  <label id="lbl-studio-customer-name" for="studio-customer-name">Tên khách hàng (Tùy chọn)</label>
+                  <input type="text" id="studio-customer-name" class="form-control" placeholder="Ví dụ: Anh Tuấn" oninput="generateFanpageCaption(); renderContentCanvas();">
+                </div>
+              </div>
+
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                <div class="form-group">
+                  <label id="lbl-studio-services-text" for="studio-services-text">Dịch vụ thực hiện</label>
+                  <input type="text" id="studio-services-text" class="form-control" placeholder="Ví dụ: Vệ sinh chuyên sâu + Repaint đế" oninput="generateFanpageCaption(); renderContentCanvas();">
+                </div>
+                <div class="form-group">
+                  <label id="lbl-studio-price-text" for="studio-price-text">Tổng chi phí / Giá dịch vụ</label>
+                  <input type="text" id="studio-price-text" class="form-control" placeholder="Ví dụ: 250.000đ" oninput="generateFanpageCaption(); renderContentCanvas();">
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label id="lbl-studio-notes-text" for="studio-notes-text">Ghi chú tình trạng / Điểm nổi bật</label>
+                <input type="text" id="studio-notes-text" class="form-control" placeholder="Ví dụ: Ố vàng lâu năm đã được tẩy trắng sáng như mới" oninput="generateFanpageCaption(); renderContentCanvas();">
+              </div>
+
+              <!-- Suggestion Presets & Tone Selection -->
+              <h3 class="studio-card-title" style="margin-top: 24px;">
+                <svg viewBox="0 0 24 24" style="width:20px;height:20px;fill:var(--color-brand-gold);"><path d="M9 21c0 .55.45 1 1 1h4c.55 0 1-.45 1-1v-1H9v1zm3-19C8.14 2 5 5.14 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.86-3.14-7-7-7z"/></svg>
+                2. Gợi Ý Mẫu Bài Viết & Giọng Văn
+              </h3>
+
+              <div class="form-group">
+                <label>Chọn gợi ý chủ đề bài viết (Preset Template)</label>
+                <div class="preset-pill-group">
+                  <button type="button" class="preset-pill active" data-preset="before_after" onclick="selectPresetTemplate(this)">✨ Before & After (Khoe thành quả)</button>
+                  <button type="button" class="preset-pill" data-preset="tips" onclick="selectPresetTemplate(this)">💡 Mẹo vặt & Bảo quản giày</button>
+                  <button type="button" class="preset-pill" data-preset="feedback" onclick="selectPresetTemplate(this)">💬 Feedback & Cảm ơn khách hàng</button>
+                  <button type="button" class="preset-pill" data-preset="promotion" onclick="selectPresetTemplate(this)">🔥 Khuyến mãi & Tri ân</button>
+                  <button type="button" class="preset-pill" data-preset="story" onclick="selectPresetTemplate(this)">🛠️ Kể chuyện quy trình Spa tỉ mỉ</button>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label>Chọn phong cách / Giọng văn (Tone)</label>
+                <div class="tone-button-group">
+                  <button type="button" class="tone-btn active" data-tone="friendly" onclick="selectTone(this)">😊 Thân thiện & Năng động</button>
+                  <button type="button" class="tone-btn" data-tone="professional" onclick="selectTone(this)">💼 Chuyên nghiệp & Đáng tin</button>
+                  <button type="button" class="tone-btn" data-tone="viral" onclick="selectTone(this)">🚀 Giật gân & Thu hút (Viral)</button>
+                  <button type="button" class="tone-btn" data-tone="luxury" onclick="selectTone(this)">✨ Sang trọng (Premium)</button>
+                </div>
+              </div>
+
+              <button type="button" class="btn btn-primary w-full" style="padding: 12px; font-weight: 700; font-size: 1rem;" onclick="generateFanpageCaption()">
+                ✨ TẠO BÀI VIẾT FANPAGE NGAY
+              </button>
+
+              <!-- Output Caption Result -->
+              <div class="form-group" style="margin-top: 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                  <label for="studio-caption-output" style="margin: 0;">Nội dung bài viết Fanpage tạo ra:</label>
+                  <button type="button" class="btn btn-secondary btn-sm" onclick="copyStudioCaption()">📋 Sao chép bài viết</button>
+                </div>
+                <textarea id="studio-caption-output" class="form-control" rows="12" style="font-family: inherit; font-size: 0.9rem; line-height: 1.5;" placeholder="Bấm nút trên để tạo bài viết tự động..."></textarea>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- RIGHT COLUMN: GRAPHIC IMAGE CANVAS GENERATOR -->
+          <div class="studio-col image-canvas-col">
+            <div class="data-card studio-card">
+              <h3 class="studio-card-title">
+                <svg viewBox="0 0 24 24" style="width:20px;height:20px;fill:var(--color-brand-gold);"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
+                3. Thiết Kế Ảnh Content Fanpage (Graphic Canvas)
+              </h3>
+
+              <!-- Graphic Template Selector -->
+              <div class="form-group">
+                <label>Gợi ý Mẫu Thiết Kế Ảnh (Graphic Templates)</label>
+                <div class="graphic-template-grid">
+                  <div class="graphic-tpl-card active" data-tpl="before_after_split" onclick="selectGraphicTemplate(this)">
+                    <div class="tpl-preview-box tpl-before-after-box">
+                      <span>BEFORE</span>
+                      <span>AFTER</span>
+                    </div>
+                    <div class="tpl-title">Mẫu 1: Before & After</div>
+                  </div>
+                  <div class="graphic-tpl-card" data-tpl="showcase_badge" onclick="selectGraphicTemplate(this)">
+                    <div class="tpl-preview-box tpl-showcase-box" style="background: linear-gradient(135deg, #1E293B, #0F172A); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;">
+                      <span style="font-size: 0.7rem; font-weight: 700; color: #F59E0B;">💡 MẸO VẶT GIÀY</span>
+                      <span style="font-size: 0.65rem; color: #94A3B8;">[Ảnh Giày + Ý Chính]</span>
+                    </div>
+                    <div class="tpl-title">Mẫu 2: Mẹo Vặt Vệ Sinh Giày</div>
+                  </div>
+                  <div class="graphic-tpl-card" data-tpl="customer_feedback" onclick="selectGraphicTemplate(this)">
+                    <div class="tpl-preview-box tpl-feedback-box">
+                      <span>★★★★★</span>
+                      <span>FEEDBACK</span>
+                    </div>
+                    <div class="tpl-title">Mẫu 3: Feedback Khách</div>
+                  </div>
+                  <div class="graphic-tpl-card" data-tpl="promo_banner" onclick="selectGraphicTemplate(this)">
+                    <div class="tpl-preview-box tpl-promo-box">
+                      <span>SALE OFF</span>
+                      <span>DỊCH VỤ</span>
+                    </div>
+                    <div class="tpl-title">Mẫu 4: Banner Quảng Cáo</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Color / Style Options -->
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                <div class="form-group">
+                  <label for="canvas-theme-select">Tông màu chủ đạo</label>
+                  <select id="canvas-theme-select" class="form-control" onchange="renderContentCanvas()">
+                    <option value="brand_dark">Nâu Đen Sang Trọng (Brand Gold)</option>
+                    <option value="brand_cream">Kem Ấm Nóng (Brand Cream)</option>
+                    <option value="midnight">Đen Neon Midnight</option>
+                    <option value="emerald">Xanh Ngọc Emerald</option>
+                    <option value="sunset">Cam Hồng Sunset</option>
+                  </select>
+                </div>
+
+                <div class="form-group">
+                  <label for="canvas-badge-input">Nội dung Tem Nhãn (Badge)</label>
+                  <input type="text" id="canvas-badge-input" class="form-control" value="SPA GIÀY CAO CẤP" oninput="renderContentCanvas()">
+                </div>
+              </div>
+
+              <!-- Toggles -->
+              <div style="display: flex; gap: 16px; margin-bottom: 16px; flex-wrap: wrap;">
+                <label style="font-weight: 500; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                  <input type="checkbox" id="canvas-show-logo" checked onchange="renderContentCanvas()"> Hiện Logo Cửa Hàng
+                </label>
+                <label style="font-weight: 500; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                  <input type="checkbox" id="canvas-show-hotline" checked onchange="renderContentCanvas()"> Hiện Hotline & Địa chỉ
+                </label>
+                <label style="font-weight: 500; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                  <input type="checkbox" id="canvas-show-price" checked onchange="renderContentCanvas()"> Hiện Khung Giá
+                </label>
+              </div>
+
+              <!-- Live Canvas Preview Box -->
+              <div class="canvas-preview-wrapper">
+                <canvas id="content-studio-canvas" width="1080" height="1080"></canvas>
+              </div>
+
+              <!-- Canvas Action Buttons -->
+              <div style="display: flex; gap: 12px; margin-top: 16px; flex-wrap: wrap;">
+                <button type="button" class="btn btn-primary" style="flex: 1; padding: 12px; font-weight: 700;" onclick="downloadStudioCanvasImage()">
+                  📥 TẢI ÁNH HD VỀ MÁY (PNG)
+                </button>
+                <button type="button" class="btn btn-secondary" style="padding: 12px 16px; font-weight: 600;" onclick="copyStudioCanvasImage()">
+                  🖼️ SAO CHÉP ÁNH
+                </button>
+                <button type="button" id="btn-publish-fb" class="btn btn-facebook" style="width: 100%; margin-top: 8px; padding: 14px; font-weight: 700; font-size: 1rem; display: flex; align-items: center; justify-content: center; gap: 8px;" onclick="publishToFacebookFanpage()">
+                  <svg viewBox="0 0 24 24" style="width: 22px; height: 22px; fill: #FFFFFF;"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+                  🚀 ĐĂNG TỰ ĐỘNG LÊN FANPAGE FACEBOOK
+                </button>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= VIEW: EXPENSES MANAGEMENT ================= -->
+      <section id="view-expenses" class="view-section">
+        <div class="top-bar">
+          <div class="page-title">
+            <h2>Quản Lý Chi Phí Kinh Doanh</h2>
+            <p>Theo dõi các khoản chi phí phát sinh hàng tháng & khấu trừ vào lợi nhuận ròng</p>
+          </div>
+          <button class="btn btn-primary" onclick="openExpenseModal()">
+            <svg viewBox="0 0 24 24" style="width: 18px; height: 18px; fill: #FFFFFF;"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+            Thêm khoản chi mới
+          </button>
+        </div>
+
+        <!-- Expenses Summary Cards -->
+        <div class="dashboard-stats" style="margin-bottom: 24px;">
+          <div class="stat-card">
+            <div class="stat-info">
+              <h3>Tổng chi phí lọc</h3>
+              <div class="stat-value" id="exp-stat-total" style="font-size: 1.35rem; color: #EF4444;">0đ</div>
+            </div>
+            <div class="stat-icon" style="background-color: rgba(239, 68, 68, 0.15);">
+              <svg viewBox="0 0 24 24" fill="#EF4444"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-info">
+              <h3>Mặt bằng & Điện nước</h3>
+              <div class="stat-value" id="exp-stat-rent-utilities" style="font-size: 1.35rem;">0đ</div>
+            </div>
+            <div class="stat-icon" style="background-color: rgba(245, 158, 11, 0.15);">
+              <svg viewBox="0 0 24 24" fill="#F59E0B"><path d="M12 3L2 12h3v8h6v-6h2v6h6v-8h3L12 3z"/></svg>
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-info">
+              <h3>Lương nhân viên & Phụ cấp</h3>
+              <div class="stat-value" id="exp-stat-salaries" style="font-size: 1.35rem;">0đ</div>
+            </div>
+            <div class="stat-icon" style="background-color: rgba(59, 130, 246, 0.15);">
+              <svg viewBox="0 0 24 24" fill="#3B82F6"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-info">
+              <h3>Hóa chất, Vật tư & Khác</h3>
+              <div class="stat-value" id="exp-stat-supplies-other" style="font-size: 1.35rem;">0đ</div>
+            </div>
+            <div class="stat-icon" style="background-color: rgba(16, 185, 129, 0.15);">
+              <svg viewBox="0 0 24 24" fill="#10B981"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+            </div>
+          </div>
+        </div>
+
+        <!-- Filters Bar -->
+        <div class="filters-bar" style="margin-bottom: 24px; background-color: var(--bg-card); padding: 16px; border-radius: var(--radius-md); border: 1px solid rgba(234, 223, 213, 0.5); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+          <div style="font-weight: 700; color: var(--color-brand-brown);">Bộ lọc chi phí:</div>
+          <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+            <select id="exp-filter-month" class="filter-select" onchange="renderExpenses()">
+              <option value="all">Tất cả các tháng</option>
+              <option value="1">Tháng 1</option>
+              <option value="2">Tháng 2</option>
+              <option value="3">Tháng 3</option>
+              <option value="4">Tháng 4</option>
+              <option value="5">Tháng 5</option>
+              <option value="6">Tháng 6</option>
+              <option value="7">Tháng 7</option>
+              <option value="8">Tháng 8</option>
+              <option value="9">Tháng 9</option>
+              <option value="10">Tháng 10</option>
+              <option value="11">Tháng 11</option>
+              <option value="12">Tháng 12</option>
+            </select>
+
+            <select id="exp-filter-year" class="filter-select" onchange="renderExpenses()">
+              <option value="all">Tất cả các năm</option>
+              <option value="2025">2025</option>
+              <option value="2026">2026</option>
+              <option value="2027">2027</option>
+            </select>
+
+            <select id="exp-filter-category" class="filter-select" onchange="renderExpenses()">
+              <option value="all">Tất cả danh mục</option>
+              <option value="rent">Mặt bằng / Cửa hàng</option>
+              <option value="salaries">Lương nhân viên & Phụ cấp</option>
+              <option value="supplies">Dung dịch, Hóa chất & Vật tư Spa</option>
+              <option value="utilities">Điện, Nước & Internet</option>
+              <option value="marketing">Quảng cáo & Marketing</option>
+              <option value="other">Chi phí khác</option>
+            </select>
+
+            <button type="button" class="btn btn-secondary btn-sm" onclick="resetExpenseFilters()">Đặt lại</button>
+          </div>
+        </div>
+
+        <!-- Expense Table Card -->
+        <div class="data-card">
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Mã khoản chi</th>
+                  <th>Ngày chi</th>
+                  <th>Danh mục</th>
+                  <th>Nội dung chi / Lý do</th>
+                  <th>Số tiền chi</th>
+                  <th>Người tạo</th>
+                  <th style="text-align: right;">Thao tác</th>
+                </tr>
+              </thead>
+              <tbody id="expenses-table-body">
+                <!-- Expenses rendered via JS -->
+              </tbody>
+            </table>
+          </div>
         </div>
       </section>
 
@@ -543,6 +987,52 @@
     </div>
   </div>
 
+  <!-- ================= MODAL: CREATE / EDIT EXPENSE ================= -->
+  <div class="modal-overlay" id="expense-modal">
+    <div class="modal-card" style="max-width: 540px;">
+      <div class="modal-header">
+        <h3 id="expense-modal-title">Thêm Khoản Chi Mới</h3>
+        <button class="close-modal-btn" onclick="closeExpenseModal()">&times;</button>
+      </div>
+      <form id="expense-form" onsubmit="handleExpenseSubmit(event)">
+        <input type="hidden" id="exp-id">
+        <div class="modal-body">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+            <div class="form-group" style="margin-bottom: 0;">
+              <label for="exp-date">Ngày phát sinh chi *</label>
+              <input type="date" id="exp-date" class="form-control" required>
+            </div>
+            <div class="form-group" style="margin-bottom: 0;">
+              <label for="exp-category">Danh mục chi phí *</label>
+              <select id="exp-category" class="form-control" required>
+                <option value="rent">🏢 Mặt bằng / Cửa hàng</option>
+                <option value="salaries">👥 Lương nhân viên & Phụ cấp</option>
+                <option value="supplies">🧼 Dung dịch, Hóa chất & Vật tư Spa</option>
+                <option value="utilities">⚡ Điện, Nước & Internet</option>
+                <option value="marketing">📢 Quảng cáo & Marketing</option>
+                <option value="other">📦 Chi phí khác</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="exp-amount">Số tiền chi (VND) *</label>
+            <input type="number" id="exp-amount" class="form-control" required placeholder="Ví dụ: 1500000" min="1000" step="1000">
+          </div>
+
+          <div class="form-group">
+            <label for="exp-description">Ghi chú nội dung / Lý do chi *</label>
+            <textarea id="exp-description" class="form-control" rows="3" required placeholder="Ví dụ: Thanh toán tiền điện cửa hàng tháng 7/2026"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeExpenseModal()">Hủy</button>
+          <button type="submit" id="expense-submit-btn" class="btn btn-primary">Lưu khoản chi</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- ================= MODAL: ORDER DETAIL & RECEIPT VIEW ================= -->
   <div class="modal-overlay" id="detail-modal">
     <div class="modal-card">
@@ -616,6 +1106,9 @@
         <button class="btn btn-secondary" onclick="copyTrackingLink(state.currentEditingOrder ? state.currentEditingOrder.id : '')" title="Sao chép link tra cứu đơn hàng">
           <svg style="width: 18px; height: 18px; fill: var(--color-brand-gold);" viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
           Sao chép link tra cứu
+        </button>
+        <button class="btn btn-primary" style="background-color: var(--color-brand-gold); border-color: var(--color-brand-gold);" onclick="createContentFromDetailModal()" title="Tạo bài viết & ảnh Fanpage từ đơn này">
+          ✨ Tạo Content Fanpage
         </button>
         <button class="btn btn-success" id="btn-detail-pay" style="display: none;" onclick="quickPayOrder()">
           <svg style="width: 18px; height: 18px;" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1.41 16.09V20h-2.68v-1.92c-1.94-.28-3.57-1.49-3.73-3.48h2.09c.12.96.99 1.54 1.64 1.54.91 0 1.62-.51 1.62-1.39 0-1-.61-1.36-2.09-1.84-1.98-.64-3.58-1.47-3.58-3.69 0-1.82 1.39-3.13 3.32-3.44V4h2.68v1.9c1.62.24 3.01 1.34 3.26 3.19h-2.06c-.22-.84-.81-1.33-1.55-1.33-.86 0-1.42.49-1.42 1.15 0 .84.58 1.19 1.99 1.69 2.11.75 3.68 1.56 3.68 3.82 0 1.91-1.41 3.23-3.67 3.51z" fill="currentColor"/></svg>

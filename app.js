@@ -6,11 +6,13 @@ const state = {
   orders: [],
   services: [],
   users: [],
+  expenses: [],
   storeInfo: null,
   activeView: 'login',
   currentEditingOrder: null,
   currentEditingService: null,
   currentEditingEmployee: null,
+  currentEditingExpense: null,
   tempSelectedFiles: [], // temporary selected files for upload [{id, file, previewUrl}]
   tempExistingImages: [] // existing images kept when editing [{url}]
 };
@@ -78,6 +80,23 @@ async function initData() {
       const ordersSnap = await window.db.collection('v2_orders').get();
       state.orders = ordersSnap.docs.map(doc => doc.data());
       saveState('pb_v2_orders', state.orders);
+
+      // 4. Load expenses
+      try {
+        const expensesSnap = await window.db.collection('v2_expenses').get();
+        if (expensesSnap.empty) {
+          for (let exp of window.DEFAULT_EXPENSES || []) {
+            await window.db.collection('v2_expenses').doc(exp.id).set(exp);
+          }
+          state.expenses = window.DEFAULT_EXPENSES || [];
+        } else {
+          state.expenses = expensesSnap.docs.map(doc => doc.data());
+        }
+      } catch (expErr) {
+        console.error("Error loading expenses from Firebase V2:", expErr);
+        state.expenses = JSON.parse(localStorage.getItem('pb_v2_expenses') || 'null') || window.DEFAULT_EXPENSES || [];
+      }
+      saveState('pb_v2_expenses', state.expenses);
       
     } catch (error) {
       console.error("Firebase V2 sync failed, falling back to LocalStorage:", error);
@@ -130,15 +149,18 @@ function loadFromLocalStorage() {
   if (!localStorage.getItem('pb_v2_orders')) {
     localStorage.setItem('pb_v2_orders', JSON.stringify(window.INITIAL_ORDERS || []));
   }
+  if (!localStorage.getItem('pb_v2_expenses')) {
+    localStorage.setItem('pb_v2_expenses', JSON.stringify(window.DEFAULT_EXPENSES || []));
+  }
 
   state.storeInfo = JSON.parse(localStorage.getItem('pb_v2_store_info'));
   state.users = JSON.parse(localStorage.getItem('pb_v2_users'));
   state.services = JSON.parse(localStorage.getItem('pb_v2_services'));
   state.orders = JSON.parse(localStorage.getItem('pb_v2_orders'));
+  state.expenses = JSON.parse(localStorage.getItem('pb_v2_expenses'));
 }
 
 // Sync helper that updates LocalStorage instantly and uploads to Firebase asynchronously
-// Sync helper that updates LocalStorage instantly
 function saveState(key, data) {
   try {
     localStorage.setItem(key, JSON.stringify(data));
@@ -154,7 +176,7 @@ function switchView(viewId) {
     viewId = 'login';
   }
   
-  if (state.currentUser && state.currentUser.role !== 'admin' && ['dashboard', 'services', 'employees', 'store-settings'].includes(viewId)) {
+  if (state.currentUser && state.currentUser.role !== 'admin' && ['dashboard', 'services', 'employees', 'store-settings', 'expenses'].includes(viewId)) {
     // Staff cannot access admin views
     viewId = 'orders';
   }
@@ -182,6 +204,8 @@ function switchView(viewId) {
     renderDashboard();
   } else if (viewId === 'orders') {
     renderOrders();
+  } else if (viewId === 'expenses') {
+    renderExpenses();
   } else if (viewId === 'customers') {
     renderCustomers();
   } else if (viewId === 'services') {
@@ -190,6 +214,8 @@ function switchView(viewId) {
     renderEmployeesList();
   } else if (viewId === 'store-settings') {
     populateStoreSettingsForm();
+  } else if (viewId === 'content-studio') {
+    renderContentStudio();
   }
 }
 
@@ -312,6 +338,10 @@ function populateStoreSettingsForm() {
   if (logoInput) logoInput.value = info.logoUrl || '';
   const noteInput = document.getElementById('store-receipt-note-input');
   if (noteInput) noteInput.value = info.receiptNote || '';
+  const fbPageIdInput = document.getElementById('store-fb-page-id');
+  if (fbPageIdInput) fbPageIdInput.value = info.fbPageId || '';
+  const fbPageTokenInput = document.getElementById('store-fb-page-token');
+  if (fbPageTokenInput) fbPageTokenInput.value = info.fbPageToken || '';
 
   updateStoreLogoPreview(info.logoUrl || '');
 }
@@ -351,6 +381,8 @@ async function handleStoreSettingsSubmit(e) {
   const address = document.getElementById('store-address-input').value.trim();
   const logoUrl = document.getElementById('store-logo-url').value.trim();
   const receiptNote = document.getElementById('store-receipt-note-input').value.trim();
+  const fbPageId = document.getElementById('store-fb-page-id').value.trim();
+  const fbPageToken = document.getElementById('store-fb-page-token').value.trim();
 
   state.storeInfo = {
     name,
@@ -358,7 +390,9 @@ async function handleStoreSettingsSubmit(e) {
     hotline,
     address,
     logoUrl,
-    receiptNote
+    receiptNote,
+    fbPageId,
+    fbPageToken
   };
 
   saveState('pb_v2_store_info', state.storeInfo);
@@ -400,7 +434,7 @@ function updateProfileUI() {
     document.getElementById('profile-initials').textContent = state.currentUser.name.split(' ').pop().substring(0, 2).toUpperCase();
     
     // Hide/Show Admin items in sidebar menu
-    const adminItems = document.querySelectorAll('.admin-only');
+    const adminItems = document.querySelectorAll('.sidebar-menu .admin-only');
     adminItems.forEach(item => {
       item.style.display = state.currentUser.role === 'admin' ? 'block' : 'none';
     });
@@ -577,6 +611,9 @@ function renderOrders() {
           </button>
           <button class="action-btn edit" onclick="copyTrackingLink('${o.id}')" title="Sao chép link tra cứu">
             <svg viewBox="0 0 24 24" style="color: var(--color-brand-gold);"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z" fill="currentColor"/></svg>
+          </button>
+          <button class="action-btn edit" onclick="openContentStudioWithOrder('${o.id}')" title="Sáng tạo Content & Ảnh Fanpage" style="color: var(--color-brand-gold);">
+            <svg viewBox="0 0 24 24"><path d="M12 3c-4.97 0-9 4.03-9 9 0 2.12.74 4.07 1.97 5.61L4.35 21l3.56-.63C9.37 20.73 10.64 21 12 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 14h-2v-2h2v2zm0-4h-2V7h2v6z" fill="currentColor"/></svg>
           </button>
           <button class="action-btn edit" onclick="openOrderModal('${o.id}')" title="Chỉnh sửa đơn hàng">
             <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
@@ -1491,16 +1528,43 @@ function renderDashboard() {
     .filter(o => o.status !== 'cancelled')
     .reduce((sum, o) => sum + o.totalPrice, 0);
 
-  const realizedRevenue = filteredOrders
+  const grossRealizedRevenue = filteredOrders
     .filter(o => ['paid', 'delivered'].includes(o.status))
     .reduce((sum, o) => sum + o.totalPrice, 0);
+
+  // Filter expenses matching dashboard period
+  const filteredExpenses = (state.expenses || []).filter(e => isDateMatch(e.date, dbFilterDate, dbFilterMonth, dbFilterYear));
+  const totalExpenses = filteredExpenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+
+  // Expense deduction mode: 'gross' (default: chưa trừ chi phí) vs 'net' (đã trừ chi phí)
+  const expenseModeEl = document.getElementById('db-filter-expense-mode');
+  const isNetMode = expenseModeEl && expenseModeEl.value === 'net';
+
+  const displayRealizedRevenue = isNetMode ? (grossRealizedRevenue - totalExpenses) : grossRealizedRevenue;
 
   // Update DOM stats
   document.getElementById('stat-total-orders').textContent = totalOrders;
   document.getElementById('stat-active-orders').textContent = activeOrders;
   document.getElementById('stat-completed-orders').textContent = completedOrders;
   document.getElementById('stat-revenue-expected').textContent = formatVND(expectedRevenue);
-  document.getElementById('stat-revenue-realized').textContent = formatVND(realizedRevenue);
+
+  const expStat = document.getElementById('stat-total-expenses');
+  if (expStat) expStat.textContent = formatVND(totalExpenses);
+
+  const lblRealized = document.getElementById('lbl-stat-revenue-realized');
+  if (lblRealized) {
+    lblRealized.textContent = isNetMode ? 'Doanh thu thực nhận (Đã trừ chi phí)' : 'Doanh thu thực nhận (Chưa trừ chi phí)';
+  }
+
+  const realizedStat = document.getElementById('stat-revenue-realized');
+  if (realizedStat) {
+    realizedStat.textContent = formatVND(displayRealizedRevenue);
+    if (isNetMode) {
+      realizedStat.style.color = displayRealizedRevenue >= 0 ? 'var(--status-completed-text)' : '#EF4444';
+    } else {
+      realizedStat.style.color = 'var(--status-completed-text)';
+    }
+  }
 
   // Render Canvas Charts using the filtered list
   drawRevenueTrendChart(filteredOrders);
@@ -1899,12 +1963,18 @@ window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('db-filter-date').addEventListener('change', renderDashboard);
   document.getElementById('db-filter-month').addEventListener('change', renderDashboard);
   document.getElementById('db-filter-year').addEventListener('change', renderDashboard);
+  if (document.getElementById('db-filter-expense-mode')) {
+    document.getElementById('db-filter-expense-mode').addEventListener('change', renderDashboard);
+  }
 
   // Reset dashboard filters
   document.getElementById('btn-reset-db-filters').addEventListener('click', () => {
     document.getElementById('db-filter-date').value = '';
     document.getElementById('db-filter-month').value = currentMonth.toString();
     document.getElementById('db-filter-year').value = currentYear.toString();
+    if (document.getElementById('db-filter-expense-mode')) {
+      document.getElementById('db-filter-expense-mode').value = 'gross';
+    }
     renderDashboard();
   });
 
@@ -2291,3 +2361,1575 @@ function showToast(message) {
     toast.remove();
   }, 3000);
 }
+
+// ================= 7. CONTENT & GRAPHIC FANPAGE STUDIO =================
+const studioState = {
+  sourceMode: 'order', // 'order' | 'custom'
+  selectedOrderId: '',
+  images: [], // array of base64 or URL strings
+  preset: 'before_after', // 'before_after' | 'price_service' | 'feedback' | 'promotion' | 'story'
+  tone: 'friendly', // 'friendly' | 'professional' | 'viral' | 'luxury'
+  graphicTemplate: 'before_after_split' // 'before_after_split' | 'showcase_badge' | 'customer_feedback' | 'promo_banner'
+};
+
+function renderContentStudio() {
+  // 1. Populate orders dropdown
+  const orderSelect = document.getElementById('studio-order-select');
+  if (orderSelect) {
+    const currentVal = orderSelect.value;
+    orderSelect.innerHTML = '<option value="">-- Chọn một đơn hàng --</option>';
+    
+    // Sort orders newest first
+    const sortedOrders = [...state.orders].sort((a, b) => new Date(b.receivedDate) - new Date(a.receivedDate));
+    sortedOrders.forEach(o => {
+      const opt = document.createElement('option');
+      opt.value = o.id;
+      const servicesText = o.services ? o.services.map(s => s.name).join(', ') : '';
+      opt.textContent = `${o.id} - ${o.customerName} (${o.shoeInfo || 'Giày'} - ${servicesText})`;
+      orderSelect.appendChild(opt);
+    });
+
+    if (studioState.selectedOrderId && state.orders.some(o => o.id === studioState.selectedOrderId)) {
+      orderSelect.value = studioState.selectedOrderId;
+      onStudioOrderSelect(studioState.selectedOrderId);
+    } else if (currentVal) {
+      orderSelect.value = currentVal;
+    }
+  }
+
+  // Ensure current mode UI is set
+  switchContentSource(studioState.sourceMode || 'order');
+  renderContentCanvas();
+}
+
+function openContentStudioWithOrder(orderId) {
+  studioState.sourceMode = 'order';
+  studioState.selectedOrderId = orderId;
+  switchView('content-studio');
+}
+
+function createContentFromDetailModal() {
+  if (state.currentEditingOrder) {
+    const orderId = state.currentEditingOrder.id;
+    closeDetailModal();
+    openContentStudioWithOrder(orderId);
+  }
+}
+
+function switchContentSource(mode) {
+  studioState.sourceMode = mode;
+  const orderTab = document.getElementById('tab-src-order');
+  const customTab = document.getElementById('tab-src-custom');
+  const orderBlock = document.getElementById('studio-src-order-block');
+  const customBlock = document.getElementById('studio-src-custom-block');
+  const promoBlock = document.getElementById('studio-src-promo-block');
+
+  if (mode === 'order') {
+    if (orderTab) orderTab.classList.add('active');
+    if (customTab) customTab.classList.remove('active');
+    if (orderBlock) orderBlock.style.display = 'block';
+    if (customBlock) customBlock.style.display = 'none';
+    if (promoBlock) promoBlock.style.display = 'none';
+
+    const orderId = document.getElementById('studio-order-select').value;
+    if (orderId) {
+      onStudioOrderSelect(orderId);
+    }
+  } else {
+    if (customTab) customTab.classList.add('active');
+    if (orderTab) orderTab.classList.remove('active');
+    if (orderBlock) orderBlock.style.display = 'none';
+
+    // Auto-select Before & After preset and template when switching to custom mode if not already set
+    if (!studioState.preset || studioState.preset === 'before_after') {
+      const beforeAfterPresetBtn = document.querySelector('.preset-pill[data-preset="before_after"]');
+      if (beforeAfterPresetBtn) selectPresetTemplate(beforeAfterPresetBtn);
+    } else {
+      updateStudioInputLabelsForPreset(studioState.preset);
+    }
+
+    renderStudioImagesPreview();
+    generateFanpageCaption();
+    renderContentCanvas();
+  }
+}
+
+function onStudioOrderSelect(orderId) {
+  studioState.selectedOrderId = orderId;
+  if (!orderId) {
+    studioState.images = [];
+    renderStudioImagesPreview();
+    return;
+  }
+
+  const order = state.orders.find(o => o.id === orderId);
+  if (!order) return;
+
+  // Auto-fill fields
+  document.getElementById('studio-shoe-info').value = order.shoeInfo || '';
+  document.getElementById('studio-customer-name').value = order.customerName || '';
+  
+  const servicesText = order.services ? order.services.map(s => `${s.name}${s.quantity > 1 ? ` (x${s.quantity})` : ''}`).join(' + ') : '';
+  document.getElementById('studio-services-text').value = servicesText;
+  document.getElementById('studio-price-text').value = formatVND(order.totalPrice || 0);
+  document.getElementById('studio-notes-text').value = order.notes || '';
+
+  studioState.images = order.images && order.images.length > 0 ? [...order.images] : [];
+  renderStudioImagesPreview();
+  
+  // Auto generate caption & render canvas
+  generateFanpageCaption();
+  renderContentCanvas();
+}
+
+async function handleStudioBeforeImage(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  try {
+    const compressed = await compressImage(file, 900, 900, 0.85);
+    studioState.images[0] = compressed;
+
+    const previewBox = document.getElementById('studio-before-preview-box');
+    if (previewBox) {
+      previewBox.innerHTML = `<img src="${compressed}" style="width: 100%; height: 100px; object-fit: cover; border-radius: 6px; border: 2px solid #DC2626;">`;
+    }
+  } catch (err) {
+    console.error("Lỗi nén ảnh Before:", err);
+  }
+
+  renderStudioImagesPreview();
+  generateFanpageCaption();
+  renderContentCanvas();
+}
+
+async function handleStudioAfterImage(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  try {
+    const compressed = await compressImage(file, 900, 900, 0.85);
+    studioState.images[1] = compressed;
+
+    const previewBox = document.getElementById('studio-after-preview-box');
+    if (previewBox) {
+      previewBox.innerHTML = `<img src="${compressed}" style="width: 100%; height: 100px; object-fit: cover; border-radius: 6px; border: 2px solid #16A34A;">`;
+    }
+  } catch (err) {
+    console.error("Lỗi nén ảnh After:", err);
+  }
+
+  renderStudioImagesPreview();
+  generateFanpageCaption();
+  renderContentCanvas();
+}
+
+function renderStudioImagesPreview() {
+  const container = document.getElementById('studio-images-preview');
+  if (!container) return;
+
+  if (studioState.images.length === 0) {
+    container.innerHTML = `<div style="color: var(--text-light); font-size: 0.85rem; font-style: italic;">Chưa có ảnh nào được chọn.</div>`;
+    return;
+  }
+
+  container.innerHTML = '';
+  studioState.images.forEach((url, idx) => {
+    const div = document.createElement('div');
+    div.className = 'image-preview-item';
+    div.innerHTML = `
+      <img src="${url}">
+      <button type="button" class="image-preview-delete" onclick="removeStudioImage(${idx})">&times;</button>
+    `;
+    container.appendChild(div);
+  });
+}
+
+function removeStudioImage(index) {
+  studioState.images.splice(index, 1);
+  renderStudioImagesPreview();
+  renderContentCanvas();
+}
+
+async function handleStudioPromoImage(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  try {
+    const compressed = await compressImage(file, 1080, 1080, 0.85);
+    studioState.images = [compressed];
+
+    const previewBox = document.getElementById('studio-promo-preview-box');
+    if (previewBox) {
+      previewBox.innerHTML = `<img src="${compressed}" style="width: 100%; height: 100px; object-fit: cover; border-radius: 6px; border: 2px solid #EAB308;">`;
+    }
+  } catch (err) {
+    console.error("Lỗi nén ảnh Khuyến mãi:", err);
+  }
+
+  renderStudioImagesPreview();
+  generateFanpageCaption();
+  renderContentCanvas();
+}
+
+const SHOE_TIPS_DATABASE = {
+  yellow_sole: {
+    title: 'CÁCH TẨY VẾT Ố VÀNG ĐẾ GIÀY SNEAKER TRẮNG TẠI NHÀ',
+    prep: 'Bàn chải mềm, Chanh tươi & Kem đánh răng trắng',
+    step1: 'Thoa nhẹ hỗn hợp nước chanh & kem đánh răng lên vết ố vàng',
+    step2: 'Dùng bàn chải chà nhẹ nhàng theo chiều kim đồng hồ 3-5 phút',
+    note: 'Lau lại bằng khăn ẩm, phủ giấy ăn bọc kín đế khi sấy/phơi'
+  },
+  odor_remove: {
+    title: 'MẸO KHỬ MÙI HÔI GIÀY CẤP TỐC CHỈ TRONG 1 ĐÊM',
+    prep: 'Túi trà lọc đã qua sử dụng hoặc Phấn rôm trẻ em',
+    step1: 'Đặt 2-3 túi trà khô hoặc rắc chút phấn rôm vào trong lòng giày',
+    step2: 'Để qua đêm ở nơi khô ráo, thoáng gió để hút sạch ẩm & mùi hôi',
+    note: 'Tháo rời lót giày ra giặt riêng & xịt diệt khuẩn nấm mốc'
+  },
+  suede_care: {
+    title: 'BÍ QUYẾT VỆ SINH GIÀY DA LỘN (SUEDE) KHÔNG XÙ LÔNG',
+    prep: 'Bàn chải lông ngựa/lông mềm & Cục tẩy dẻo học sinh',
+    step1: 'Chải nhẹ bề mặt da lộn theo MỘT CHIỀU cố định để rũ bùn đất',
+    step2: 'Dùng cục tẩy chà nhẹ nhàng lên các vết bẩn khô bám trên da lộn',
+    note: 'TUYỆT ĐỐI KHÔNG dùng nước trực tiếp làm giòn da & lem màu'
+  },
+  rain_waterproof: {
+    title: 'XỬ LÝ GIÀY BỊ ƯỚT MƯA TRÁNH BỊ Ố VÀNG & ẨM MỐC',
+    prep: 'Khăn bông mềm & Giấy báo trắng hoặc Giấy hút ẩm',
+    step1: 'Gột sạch bùn đất bên ngoài, lau khô bằng khăn bông mềm',
+    step2: 'Vo tròn giấy báo nhét căng vào lòng giày để hút ẩm & giữ form',
+    note: 'Sấy ở chế độ gió mát, không sấy nhiệt nóng làm teo đế cao su'
+  },
+  scuff_mark: {
+    title: 'TẨY VẾT XƯỚC ĐEN TRÊN GIÀY DA TRẮNG CỰC DỄ',
+    prep: 'Bông tẩy trang & Nước tẩy trang hoặc Dầu gió xanh',
+    step1: 'Thấm chút dung dịch tẩy trang vào bông tẩy trang/bọt biển magic',
+    step2: 'Chà nhẹ nhàng lên vết xước đen bám trên thân da hoặc đế giày',
+    note: 'Thoa một lớp kem dưỡng mỏng sau khi lau để bảo vệ mặt da'
+  }
+};
+
+function applyQuickShoeTip(tipId, btn) {
+  const tip = SHOE_TIPS_DATABASE[tipId];
+  if (!tip) return;
+
+  if (btn) {
+    const parent = btn.parentElement;
+    if (parent) {
+      parent.querySelectorAll('.preset-pill').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    }
+  }
+
+  const inputShoe = document.getElementById('studio-shoe-info');
+  if (inputShoe) inputShoe.value = tip.title;
+
+  const inputCust = document.getElementById('studio-customer-name');
+  if (inputCust) inputCust.value = tip.prep;
+
+  const inputServ = document.getElementById('studio-services-text');
+  if (inputServ) inputServ.value = tip.step1;
+
+  const inputPrice = document.getElementById('studio-price-text');
+  if (inputPrice) inputPrice.value = tip.step2;
+
+  const inputNotes = document.getElementById('studio-notes-text');
+  if (inputNotes) inputNotes.value = tip.note;
+
+  generateFanpageCaption();
+  renderContentCanvas();
+}
+
+function updateStudioInputLabelsForPreset(preset) {
+  const isPromo = (preset === 'promotion');
+  const isTips = (preset === 'tips');
+
+  const quickTipsBox = document.getElementById('studio-quick-tips-container');
+  if (quickTipsBox) {
+    quickTipsBox.style.display = isTips ? 'block' : 'none';
+  }
+
+  const lblShoe = document.getElementById('lbl-studio-shoe-info');
+  const inputShoe = document.getElementById('studio-shoe-info');
+
+  const lblCust = document.getElementById('lbl-studio-customer-name');
+  const inputCust = document.getElementById('studio-customer-name');
+
+  const lblServ = document.getElementById('lbl-studio-services-text');
+  const inputServ = document.getElementById('studio-services-text');
+
+  const lblPrice = document.getElementById('lbl-studio-price-text');
+  const inputPrice = document.getElementById('studio-price-text');
+
+  const lblNotes = document.getElementById('lbl-studio-notes-text');
+  const inputNotes = document.getElementById('studio-notes-text');
+
+  // Clear tip values when switching away from Mẫu 2 (tips mode) so they NEVER leak into other templates!
+  if (!isTips && inputShoe) {
+    const curVal = inputShoe.value.trim();
+    const isTipText = Object.values(SHOE_TIPS_DATABASE).some(t => t.title === curVal) ||
+                      curVal.includes('CÁCH TẨY') || curVal.includes('MẸO KHỬ') || 
+                      curVal.includes('BÍ QUYẾT') || curVal.includes('XỬ LÝ GIÀY') || 
+                      curVal.includes('TẨY VẾT');
+    if (isTipText) {
+      inputShoe.value = '';
+      if (inputCust) inputCust.value = '';
+      if (inputServ) inputServ.value = '';
+      if (inputPrice) inputPrice.value = '';
+      if (inputNotes) inputNotes.value = '';
+
+      // Re-fill from selected order if active
+      const orderSelect = document.getElementById('studio-order-select');
+      if (orderSelect && orderSelect.value) {
+        onStudioOrderSelect();
+      }
+    }
+  }
+
+  if (lblShoe && inputShoe) {
+    if (isPromo) {
+      lblShoe.textContent = 'Chương trình Khuyến mãi *';
+      inputShoe.placeholder = 'Ví dụ: TRI ÂN KHÁCH HÀNG - GIẢM 20%';
+    } else if (isTips) {
+      lblShoe.textContent = 'Chủ đề Mẹo Vặt Vệ Sinh Giày *';
+      inputShoe.placeholder = 'Ví dụ: CÁCH TẨY VẾT Ố VÀNG ĐẾ GIÀY SNEAKER TRẮNG';
+    } else {
+      lblShoe.textContent = 'Tên / Hiệu / Model Giày';
+      inputShoe.placeholder = 'Ví dụ: Nike Air Jordan 1 High';
+    }
+  }
+
+  if (lblCust && inputCust) {
+    if (isPromo) {
+      lblCust.textContent = 'Thời gian / Điều kiện áp dụng';
+      inputCust.placeholder = 'Ví dụ: Áp dụng từ 01/08 đến 15/08/2026';
+    } else if (isTips) {
+      lblCust.textContent = 'Dụng cụ / Nguyên liệu chuẩn bị';
+      inputCust.placeholder = 'Ví dụ: Bàn chải mềm, Chanh tươi & Kem đánh răng';
+    } else {
+      lblCust.textContent = 'Tên khách hàng (Tùy chọn)';
+      inputCust.placeholder = 'Ví dụ: Anh Tuấn';
+    }
+  }
+
+  if (lblServ && inputServ) {
+    if (isPromo) {
+      lblServ.textContent = 'Nội dung Ưu đãi / Dịch vụ áp dụng';
+      inputServ.placeholder = 'Ví dụ: Vệ sinh giày chuyên sâu & Repaint đế';
+    } else if (isTips) {
+      lblServ.textContent = 'Bước 1: Thao tác thực hiện';
+      inputServ.placeholder = 'Ví dụ: Thoa nhẹ hỗn hợp chanh & kem đánh răng lên vết ố';
+    } else {
+      lblServ.textContent = 'Dịch vụ thực hiện';
+      inputServ.placeholder = 'Ví dụ: Vệ sinh chuyên sâu + Repaint đế';
+    }
+  }
+
+  if (lblPrice && inputPrice) {
+    if (isPromo) {
+      lblPrice.textContent = 'Giá ưu đãi / Mức giảm giá';
+      inputPrice.placeholder = 'Ví dụ: Giảm 20% - Chỉ từ 50.000đ';
+    } else if (isTips) {
+      lblPrice.textContent = 'Bước 2: Thao tác thực hiện';
+      inputPrice.placeholder = 'Ví dụ: Dùng bàn chải chà nhẹ theo chiều kim đồng hồ 3-5 phút';
+    } else {
+      lblPrice.textContent = 'Tổng chi phí / Giá dịch vụ';
+      inputPrice.placeholder = 'Ví dụ: 250.000đ';
+    }
+  }
+
+  if (lblNotes && inputNotes) {
+    if (isPromo) {
+      lblNotes.textContent = 'Tagline / Khẩu hiệu thu hút';
+      inputNotes.placeholder = 'Ví dụ: Giày sạch kính kong đón hè cực chất cùng Phủi Bụi';
+    } else if (isTips) {
+      lblNotes.textContent = 'Lưu ý quan trọng / Mẹo hay';
+      inputNotes.placeholder = 'Ví dụ: Tránh phơi trực tiếp dưới ánh nắng gắt để không bị giòn đế';
+    } else {
+      lblNotes.textContent = 'Ghi chú tình trạng / Điểm nổi bật';
+      inputNotes.placeholder = 'Ví dụ: Ố vàng lâu năm đã được tẩy trắng sáng như mới';
+    }
+  }
+
+  // Toggle custom upload blocks in custom source mode
+  const customBlock = document.getElementById('studio-src-custom-block');
+  const promoBlock = document.getElementById('studio-src-promo-block');
+  if (studioState.sourceMode === 'custom') {
+    if (isPromo || isTips) {
+      if (customBlock) customBlock.style.display = 'none';
+      if (promoBlock) promoBlock.style.display = 'block';
+    } else {
+      if (customBlock) customBlock.style.display = 'block';
+      if (promoBlock) promoBlock.style.display = 'none';
+    }
+  } else {
+    if (customBlock) customBlock.style.display = 'none';
+    if (promoBlock) promoBlock.style.display = 'none';
+  }
+
+  // Auto-apply default tip #1 ONLY when switching into tips mode and input is empty
+  if (isTips && inputShoe && !inputShoe.value.trim()) {
+    const defaultBtn = document.querySelector('#studio-quick-tips-container .preset-pill');
+    applyQuickShoeTip('yellow_sole', defaultBtn);
+  }
+}
+
+const PRESET_TO_GFX_MAP = {
+  'before_after': 'before_after_split',
+  'tips': 'showcase_badge',
+  'price_service': 'showcase_badge',
+  'feedback': 'customer_feedback',
+  'promotion': 'promo_banner',
+  'story': 'showcase_badge'
+};
+
+const GFX_TO_PRESET_MAP = {
+  'before_after_split': 'before_after',
+  'showcase_badge': 'tips',
+  'customer_feedback': 'feedback',
+  'promo_banner': 'promotion'
+};
+
+function selectPresetTemplate(btn, skipSync = false) {
+  document.querySelectorAll('.preset-pill').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  studioState.preset = btn.getAttribute('data-preset');
+
+  if (!skipSync) {
+    const matchingGfxTpl = PRESET_TO_GFX_MAP[studioState.preset];
+    if (matchingGfxTpl) {
+      const gfxCard = document.querySelector(`.graphic-tpl-card[data-tpl="${matchingGfxTpl}"]`);
+      if (gfxCard) {
+        document.querySelectorAll('.graphic-tpl-card').forEach(c => c.classList.remove('active'));
+        gfxCard.classList.add('active');
+        studioState.graphicTemplate = matchingGfxTpl;
+      }
+    }
+  }
+
+  updateStudioInputLabelsForPreset(studioState.preset);
+  generateFanpageCaption();
+  renderContentCanvas();
+}
+
+function selectGraphicTemplate(card, skipSync = false) {
+  document.querySelectorAll('.graphic-tpl-card').forEach(c => c.classList.remove('active'));
+  card.classList.add('active');
+  studioState.graphicTemplate = card.getAttribute('data-tpl');
+
+  if (!skipSync) {
+    const matchingPreset = GFX_TO_PRESET_MAP[studioState.graphicTemplate];
+    if (matchingPreset) {
+      const presetBtn = document.querySelector(`.preset-pill[data-preset="${matchingPreset}"]`);
+      if (presetBtn) {
+        document.querySelectorAll('.preset-pill').forEach(b => b.classList.remove('active'));
+        presetBtn.classList.add('active');
+        studioState.preset = matchingPreset;
+      }
+    }
+  }
+
+  updateStudioInputLabelsForPreset(studioState.preset);
+  generateFanpageCaption();
+  renderContentCanvas();
+}
+
+function selectTone(btn) {
+  document.querySelectorAll('.tone-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  studioState.tone = btn.getAttribute('data-tone');
+  generateFanpageCaption();
+}
+
+function generateFanpageCaption() {
+  const shoeInfo = document.getElementById('studio-shoe-info').value.trim() || 'đôi giày yêu thích';
+  const custName = document.getElementById('studio-customer-name').value.trim();
+  const servicesText = document.getElementById('studio-services-text').value.trim() || 'Vệ sinh & Chăm sóc cao cấp';
+  const priceText = document.getElementById('studio-price-text').value.trim() || 'Giá cực ưu đãi';
+  const notesText = document.getElementById('studio-notes-text').value.trim();
+  
+  const info = state.storeInfo || window.DEFAULT_STORE_INFO || {};
+  const storeName = info.name || 'SPA GIÀY';
+  const hotline = info.hotline || '0906 22 7512';
+  const address = info.address || 'Hà Nội';
+
+  let caption = '';
+  const preset = studioState.preset || 'before_after';
+  const tone = studioState.tone || 'friendly';
+
+  // Generate captions according to Preset & Tone
+  if (preset === 'before_after') {
+    if (tone === 'friendly') {
+      caption += `🌟 LỘT XÁC DIỆU KỲ CHO ĐÔI ${shoeInfo.toUpperCase()}! 👟✨\n\n`;
+      caption += `Cùng ngắm nhìn sự thay đổi bất ngờ của em giày ${shoeInfo} sau khi được đội ngũ ${storeName} "phù phép" nhé mọi người ơi!\n\n`;
+      caption += `✨ Dịch vụ thực hiện: ${servicesText}\n`;
+      if (notesText) caption += `🔍 Tình trạng & Phục hồi: ${notesText}\n`;
+      caption += `💸 Chi phí trọn gói: ${priceText}\n\n`;
+      caption += `Giày đi lâu bẩn ố hay sờn cũ cứ yên tâm gửi gắm cho ${storeName}, trả lại vẻ đẹp như vừa đập hộp! 💙\n\n`;
+    } else if (tone === 'professional') {
+      caption += `📋 BÁO CÁO KẾT QUẢ QUY TRÌNH CHĂM SÓC & PHỤC HỒI: ${shoeInfo.toUpperCase()}\n\n`;
+      caption += `${storeName} xin gửi tới quý khách hàng hình ảnh kết quả trước và sau khi hoàn thiện dịch vụ Spa cho siêu phẩm ${shoeInfo}.\n\n`;
+      caption += `📌 Hạng mục xử lý kỹ thuật:\n- Dịch vụ: ${servicesText}\n`;
+      if (notesText) caption += `- Kết quả đạt được: ${notesText}\n`;
+      caption += `- Chi phí niêm yết: ${priceText}\n\n`;
+      caption += `Cam kết sử dụng dung dịch dung môi chuyên dụng an toàn tuyệt đối cho chất liệu da & vải.\n\n`;
+    } else if (tone === 'viral') {
+      caption += `😱 KHÔNG THỂ TIN NỔI! ĐÔI ${shoeInfo.toUpperCase()} TƯỞNG BỎ ĐỊ CŨNG HỒI SINH RỰC RỠ! 🔥\n\n`;
+      caption += `Nhiều bạn cứ nghĩ giày ố bẩn nặng là xong phim rồi, nhưng qua tay các thuật sĩ tại ${storeName} thì lại biến hóa hoàn hảo 10/10! 😎\n\n`;
+      caption += `💥 Phép thuật biến hóa: ${servicesText}\n`;
+      if (notesText) caption += `✨ Điểm ăn tiền: ${notesText}\n`;
+      caption += `🏷️ Giá hời ngỡ ngàng: Chỉ ${priceText}\n\n`;
+      caption += `Tag ngay người bạn có đôi giày bẩn vào đây để đi Spa gấp nhé! 👇\n\n`;
+    } else { // luxury
+      caption += `✨ VẺ ĐẸP NGUYÊN BẢN TRỜ LẠI VỚI ${shoeInfo.toUpperCase()} ✨\n\n`;
+      caption += `Mỗi đôi giày hiệu không chỉ là phụ kiện, mà là tuyên ngôn phong cách. Tại ${storeName}, chúng tôi nâng niu từng đường kim mũi chỉ và bề mặt da cao cấp.\n\n`;
+      caption += `💎 Dịch vụ nghệ nhân: ${servicesText}\n`;
+      if (notesText) caption += `💎 Điểm nhấn phục hồi: ${notesText}\n`;
+      caption += `💎 Giá trị đầu tư: ${priceText}\n\n`;
+      caption += `Trải nghiệm dịch vụ chăm sóc giày đẳng cấp ngay hôm nay.\n\n`;
+    }
+  } else if (preset === 'tips' || preset === 'price_service') {
+    const tipTitle = document.getElementById('studio-shoe-info').value.trim() || 'CÁCH TẨY VẾT Ố VÀNG ĐẾ GIÀY SNEAKER TRẮNG';
+    const tipPrep = document.getElementById('studio-customer-name').value.trim() || 'Bàn chải mềm, Chanh tươi & Kem đánh răng';
+    const tipStep1 = document.getElementById('studio-services-text').value.trim() || 'Thoa nhẹ hỗn hợp chanh & kem đánh răng lên vết ố vàng';
+    const tipStep2 = document.getElementById('studio-price-text').value.trim() || 'Dùng bàn chải chà nhẹ nhàng theo chiều kim đồng hồ 3-5 phút';
+    const tipNote = document.getElementById('studio-notes-text').value.trim() || 'Tránh phơi trực tiếp dưới ánh nắng mặt trời gắt';
+
+    caption += `💡 MẸO VẶT BẢO QUẢN GIÀY: ${tipTitle.toUpperCase()} 👟✨\n\n`;
+    caption += `Đôi giày yêu thích bị bẩn hoặc ố vàng khiến bạn kém tự tin? Đừng lo, ${storeName} chia sẻ ngay mẹo xử lý cực dễ chỉ với nguyên liệu có sẵn tại nhà!\n\n`;
+    caption += `🧪 CHUẨN BỊ NGUYÊN LIỆU:\n- ${tipPrep}\n\n`;
+    caption += `📋 CÁC BƯỚC THỰC HIỆN:\n`;
+    caption += `1️⃣ Bước 1: ${tipStep1}\n`;
+    caption += `2️⃣ Bước 2: ${tipStep2}\n\n`;
+    if (tipNote) caption += `⚠️ LƯU Ý QUAN TRỌNG:\n- ${tipNote}\n\n`;
+    caption += `💙 Nếu bạn bận rộn hoặc gặp vết bẩn cứng đầu khó xử lý, hãy mang ngay tới ${storeName} để được chăm sóc chuẩn Spa chuyên nghiệp nhé!\n\n`;
+  } else if (preset === 'feedback') {
+    caption += `💬 FEEDBACK SIÊU CÓ TÂM TỪ KHÁCH HÀNG THÂN YÊU! ⭐⭐⭐⭐⭐\n\n`;
+    if (custName) caption += `Cảm ơn ${custName} đã gửi trọn niềm tin cho ${storeName} với đôi ${shoeInfo} nha! 🥰\n\n`;
+    else caption += `Cảm ơn quý khách hàng đã gửi trọn niềm tin cho ${storeName} với đôi ${shoeInfo} nha! 🥰\n\n`;
+    caption += `"Giày gửi Spa về sạch như mới, mùi thơm dịu nhẹ rất thích luôn ạ!"\n\n`;
+    caption += `🛠️ Dịch vụ đã trải nghiệm: ${servicesText} (${priceText})\n`;
+    if (notesText) caption += `✨ Ghi nhận: ${notesText}\n\n`;
+    caption += `Sự hài lòng của khách hàng chính là động lực lớn nhất của đội ngũ ${storeName} mỗi ngày! ❤️\n\n`;
+  } else if (preset === 'promotion') {
+    const promoTitle = document.getElementById('studio-shoe-info').value.trim() || 'CHƯƠNG TRÌNH KHUYẾN MẠI ĐẶC BIỆT';
+    const promoTime = document.getElementById('studio-customer-name').value.trim() || 'Áp dụng số lượng có hạn';
+    const promoServices = document.getElementById('studio-services-text').value.trim() || 'Áp dụng cho tất cả dịch vụ Spa & Giặt giày';
+    const promoPrice = document.getElementById('studio-price-text').value.trim() || 'Giảm 20% | Chỉ từ 50.000đ';
+    const promoTagline = document.getElementById('studio-notes-text').value.trim() || 'Giày sạch kính kong đón hè cực chất';
+
+    caption += `🔥 ${promoTitle.toUpperCase()} 🔥\n\n`;
+    caption += `📢 ${promoTagline.toUpperCase()}!\n\n`;
+    caption += `Cơ hội F5 lại toàn bộ tủ giày yêu thích của bạn cùng ${storeName} với chương trình siêu ưu đãi:\n\n`;
+    caption += `🎁 NỘI DUNG ƯU ĐÃI: ${promoServices}\n`;
+    caption += `💥 GIÁ ƯU ĐÃI: ${promoPrice}\n`;
+    caption += `⏰ THỜI GIAN ÁP DỤNG: ${promoTime}\n\n`;
+    caption += `👉 Nhanh tay Inbox Fanpage hoặc liên hệ Hotline để đăng ký giữ suất ưu đãi ngay hôm nay nhé!\n\n`;
+  } else { // story
+    caption += `🛠️ HÀNH TRÌNH PHỤC HỒI ĐÔI ${shoeInfo.toUpperCase()} TỈ MỈ TẠI WORKSHOP 🎨\n\n`;
+    caption += `Khi tiếp nhận đôi ${shoeInfo}, chúng tôi hiểu rằng đây là món đồ gắn liền với nhiều kỷ niệm của chủ nhân.\n\n`;
+    caption += `Trải qua 5 bước chăm sóc chuyên sâu:\n`;
+    caption += `1️⃣ Phân tích chất liệu da/vải & làm sạch bề mặt thô\n`;
+    caption += `2️⃣ Giặt hấp thủ công bằng dung dịch hữu cơ sinh học\n`;
+    caption += `3️⃣ Xử lý chuyên sâu: ${servicesText}\n`;
+    if (notesText) caption += `4️⃣ Kỹ thuật phục hồi: ${notesText}\n`;
+    caption += `5️⃣ Phủ nano bảo vệ bề mặt & diệt khuẩn khử mùi UV\n\n`;
+    caption += `💰 Chi phí hoàn thiện: ${priceText}\n\n`;
+  }
+
+  // Footer Contacts & Hashtags
+  caption += `------------------------------------\n`;
+  caption += `☎️ Hotline/Zalo tư vấn & đặt lịch: ${hotline}\n`;
+  caption += `📍 Địa chỉ Cửa hàng: ${address}\n`;
+  caption += `🌐 Tra cứu đơn hàng trực tuyến dễ dàng!\n\n`;
+  const cleanStoreHashtag = storeName.replace(/[^a-zA-Z0-9àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/gi, '');
+  const cleanShoeHashtag = shoeInfo.replace(/[^a-zA-Z0-9àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/gi, '');
+  caption += `#${cleanStoreHashtag} #SpaGiay #Vesinhgiay #RepaintGiay #TayOGiay #${cleanShoeHashtag}`;
+
+  const captionArea = document.getElementById('studio-caption-output');
+  if (captionArea) captionArea.value = caption;
+}
+
+function copyStudioCaption() {
+  const textarea = document.getElementById('studio-caption-output');
+  if (!textarea || !textarea.value) return;
+
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(textarea.value)
+      .then(() => showToast('Đã sao chép bài viết Fanpage thành công!'))
+      .catch(err => {
+        textarea.select();
+        document.execCommand('copy');
+        showToast('Đã sao chép bài viết Fanpage!');
+      });
+  } else {
+    textarea.select();
+    document.execCommand('copy');
+    showToast('Đã sao chép bài viết Fanpage!');
+  }
+}
+
+// Draw Canvas Engine
+function renderContentCanvas() {
+  const canvas = document.getElementById('content-studio-canvas');
+  if (!canvas) return;
+
+  const ctx = canvas.getContext('2d');
+  const width = canvas.width;   // 1080
+  const height = canvas.height; // 1080
+
+  const themeSelect = document.getElementById('canvas-theme-select');
+  const theme = themeSelect ? themeSelect.value : 'brand_dark';
+  const badgeInput = document.getElementById('canvas-badge-input');
+  const badgeText = badgeInput ? badgeInput.value.trim() : 'SPA GIÀY CAO CẤP';
+  
+  const logoCb = document.getElementById('canvas-show-logo');
+  const showLogo = logoCb ? logoCb.checked : true;
+  const hotlineCb = document.getElementById('canvas-show-hotline');
+  const showHotline = hotlineCb ? hotlineCb.checked : true;
+  const priceCb = document.getElementById('canvas-show-price');
+  const showPrice = priceCb ? priceCb.checked : true;
+
+  const shoeInput = document.getElementById('studio-shoe-info');
+  const shoeInfo = shoeInput ? (shoeInput.value.trim() || 'SHOE SPA REPAIR') : 'SHOE SPA REPAIR';
+  const priceInput = document.getElementById('studio-price-text');
+  const priceText = priceInput ? priceInput.value.trim() : '';
+  const servInput = document.getElementById('studio-services-text');
+  const servicesText = servInput ? servInput.value.trim() : '';
+  const custInput = document.getElementById('studio-customer-name');
+  const custName = custInput ? (custInput.value.trim() || 'Khách Hàng Thân Thiết') : 'Khách Hàng Thân Thiết';
+  const notesInput = document.getElementById('studio-notes-text');
+  const notesText = notesInput ? notesInput.value.trim() : '';
+  const preset = studioState.preset || 'before_after';
+
+  const info = state.storeInfo || window.DEFAULT_STORE_INFO || {};
+  const storeName = info.name || 'SPA GIÀY';
+  const hotline = info.hotline || '0906 22 7512';
+  const address = info.address || 'HÀ NỘI';
+  const logoUrl = info.logoUrl || '';
+
+  // Theme Colors
+  let bgGrad1 = '#1F1610', bgGrad2 = '#3C2A1E', accentGold = '#E89C19', textColor = '#FFFFFF', subTextColor = '#EADFD5';
+  if (theme === 'brand_cream') {
+    bgGrad1 = '#FAF6F0'; bgGrad2 = '#EADFD5'; accentGold = '#C87D0E'; textColor = '#2A1E17'; subTextColor = '#5C4436';
+  } else if (theme === 'midnight') {
+    bgGrad1 = '#0F172A'; bgGrad2 = '#1E293B'; accentGold = '#38BDF8'; textColor = '#FFFFFF'; subTextColor = '#94A3B8';
+  } else if (theme === 'emerald') {
+    bgGrad1 = '#064E3B'; bgGrad2 = '#022C22'; accentGold = '#F59E0B'; textColor = '#FFFFFF'; subTextColor = '#A7F3D0';
+  } else if (theme === 'sunset') {
+    bgGrad1 = '#881337'; bgGrad2 = '#4C0519'; accentGold = '#F97316'; textColor = '#FFFFFF'; subTextColor = '#FECDD3';
+  }
+
+  // Clear & Draw Background Gradient
+  const grad = ctx.createLinearGradient(0, 0, width, height);
+  grad.addColorStop(0, bgGrad1);
+  grad.addColorStop(1, bgGrad2);
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, width, height);
+
+  // Background Subtle Decorative Circles
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.03)';
+  ctx.beginPath();
+  ctx.arc(width * 0.9, height * 0.1, 300, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(width * 0.1, height * 0.9, 400, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Load images & draw template layout
+  const imgUrls = studioState.images || [];
+
+  function drawRoundedRect(x, y, w, h, radius, fillStyle, strokeStyle, lineWidth) {
+    ctx.beginPath();
+    ctx.moveTo(x + radius, y);
+    ctx.lineTo(x + w - radius, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + radius);
+    ctx.lineTo(x + w, y + h - radius);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - radius, y + h);
+    ctx.lineTo(x + radius, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - radius);
+    ctx.lineTo(x, y + radius);
+    ctx.quadraticCurveTo(x, y, x + radius, y);
+    ctx.closePath();
+    if (fillStyle) {
+      ctx.fillStyle = fillStyle;
+      ctx.fill();
+    }
+    if (strokeStyle) {
+      ctx.strokeStyle = strokeStyle;
+      ctx.lineWidth = lineWidth || 1;
+      ctx.stroke();
+    }
+  }
+
+  const loadImg = (url) => new Promise(resolve => {
+    if (!url) resolve(null);
+    const img = new Image();
+    img.crossOrigin = 'Anonymous';
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = url;
+  });
+
+  Promise.all([
+    loadImg(imgUrls[0]),
+    loadImg(imgUrls[1]),
+    loadImg(logoUrl)
+  ]).then(([img1, img2, logoImg]) => {
+
+    const tpl = studioState.graphicTemplate || 'before_after_split';
+
+    // 1. TOP HEADER (Store Name & Logo)
+    if (showLogo && logoImg) {
+      const logoSize = 70;
+      ctx.drawImage(logoImg, 60, 45, logoSize, logoSize);
+      
+      ctx.font = 'bold 36px "Segoe UI", sans-serif';
+      ctx.fillStyle = textColor;
+      ctx.textAlign = 'left';
+      ctx.fillText(storeName.toUpperCase(), 150, 75);
+
+      ctx.font = '600 20px "Segoe UI", sans-serif';
+      ctx.fillStyle = accentGold;
+      ctx.fillText(badgeText.toUpperCase(), 150, 105);
+    } else {
+      ctx.font = 'bold 42px "Segoe UI", sans-serif';
+      ctx.fillStyle = textColor;
+      ctx.textAlign = 'left';
+      ctx.fillText(storeName.toUpperCase(), 60, 80);
+
+      ctx.font = '600 22px "Segoe UI", sans-serif';
+      ctx.fillStyle = accentGold;
+      ctx.fillText(badgeText.toUpperCase(), 60, 115);
+    }
+
+    // Top Right Badge Pill
+    if (badgeText) {
+      drawRoundedRect(width - 330, 55, 270, 48, 24, accentGold);
+      ctx.font = 'bold 20px "Segoe UI", sans-serif';
+      ctx.fillStyle = '#FFFFFF';
+      ctx.textAlign = 'center';
+      ctx.fillText(badgeText, width - 195, 86);
+    }
+
+    // 2. MAIN TEMPLATE CONTENT AREA
+    if (tpl === 'before_after_split') {
+      // Layout 1: Split Left (Before) & Right (After)
+      const boxY = 160;
+      const boxH = 720;
+      const boxW = 465;
+
+      // Left Box (Before)
+      drawRoundedRect(60, boxY, boxW, boxH, 20, 'rgba(0,0,0,0.3)', 'rgba(255,255,255,0.1)', 2);
+      if (img1) {
+        ctx.save();
+        drawRoundedRect(60, boxY, boxW, boxH, 20);
+        ctx.clip();
+        drawCoverImage(ctx, img1, 60, boxY, boxW, boxH);
+        ctx.restore();
+      } else {
+        ctx.font = 'bold 24px "Segoe UI", sans-serif';
+        ctx.fillStyle = 'rgba(255,255,255,0.3)';
+        ctx.textAlign = 'center';
+        ctx.fillText('ẢNH TRƯỚC (BEFORE)', 60 + boxW/2, boxY + boxH/2);
+      }
+      // Label BEFORE
+      drawRoundedRect(80, boxY + 20, 140, 40, 8, '#DC2626');
+      ctx.font = 'bold 18px "Segoe UI", sans-serif';
+      ctx.fillStyle = '#FFFFFF';
+      ctx.textAlign = 'center';
+      ctx.fillText('BEFORE', 150, boxY + 46);
+
+      // Right Box (After)
+      const rightX = 555;
+      drawRoundedRect(rightX, boxY, boxW, boxH, 20, 'rgba(0,0,0,0.3)', 'rgba(255,255,255,0.1)', 2);
+      const afterImg = img2 || img1;
+      if (afterImg) {
+        ctx.save();
+        drawRoundedRect(rightX, boxY, boxW, boxH, 20);
+        ctx.clip();
+        drawCoverImage(ctx, afterImg, rightX, boxY, boxW, boxH);
+        ctx.restore();
+      } else {
+        ctx.font = 'bold 24px "Segoe UI", sans-serif';
+        ctx.fillStyle = 'rgba(255,255,255,0.3)';
+        ctx.textAlign = 'center';
+        ctx.fillText('ẢNH SAU (AFTER)', rightX + boxW/2, boxY + boxH/2);
+      }
+      // Label AFTER
+      drawRoundedRect(rightX + 20, boxY + 20, 140, 40, 8, '#16A34A');
+      ctx.font = 'bold 18px "Segoe UI", sans-serif';
+      ctx.fillStyle = '#FFFFFF';
+      ctx.textAlign = 'center';
+      ctx.fillText('AFTER', rightX + 90, boxY + 46);
+
+      // Bottom Shoe Title Banner Card
+      drawRoundedRect(60, boxY + boxH - 110, 960, 90, 16, 'rgba(15, 23, 42, 0.88)', accentGold, 2);
+      ctx.font = 'bold 28px "Segoe UI", sans-serif';
+      ctx.fillStyle = '#FFFFFF';
+      ctx.textAlign = 'left';
+      ctx.fillText(shoeInfo.toUpperCase(), 90, boxY + boxH - 65);
+
+      ctx.font = '600 20px "Segoe UI", sans-serif';
+      ctx.fillStyle = '#E2E8F0';
+      ctx.fillText(`Dịch vụ: ${servicesText || 'Spa & Phục hồi chuyên sâu'}`, 90, boxY + boxH - 32);
+
+      if (showPrice && priceText) {
+        ctx.font = 'bold 28px "Segoe UI", sans-serif';
+        ctx.fillStyle = accentGold;
+        ctx.textAlign = 'right';
+        ctx.fillText(priceText, 990, boxY + boxH - 48);
+      }
+
+    } else if (tpl === 'showcase_badge') {
+      // Layout 2: Split 2-Column Infographic Mẹo Vặt Vệ Sinh Giày Layout
+      const isTipsPreset = (preset === 'tips' || preset === 'price_service');
+      const tipTitle = isTipsPreset ? (document.getElementById('studio-shoe-info').value.trim() || 'CÁCH TẨY Ố VÀNG ĐẾ GIÀY SNEAKER TRẮNG') : shoeInfo;
+      const tipPrep = isTipsPreset ? (document.getElementById('studio-customer-name').value.trim() || 'Bàn chải mềm, Chanh tươi & Kem đánh răng') : custName;
+      const tipStep1 = servicesText || 'Thoa nhẹ hỗn hợp chanh & kem đánh răng lên vết ố vàng';
+      const tipStep2 = priceText || 'Dùng bàn chải chà nhẹ nhàng theo chiều kim đồng hồ 3-5 phút';
+      const tipNote = notesText || 'Tránh phơi trực tiếp dưới ánh nắng gắt';
+
+      // Header Badge: 💡 MẸO VẶT BẢO QUẢN GIÀY
+      drawRoundedRect(width / 2 - 240, 140, 480, 52, 26, '#F59E0B', '#FBBF24', 2);
+      ctx.font = 'bold 22px "Segoe UI", sans-serif';
+      ctx.fillStyle = '#FFFFFF';
+      ctx.textAlign = 'center';
+      ctx.fillText('💡 MẸO VẶT BẢO QUẢN GIÀY 💡', width / 2, 174);
+
+      // Main Tip Title Header
+      ctx.font = 'bold 36px "Segoe UI", sans-serif';
+      ctx.fillStyle = accentGold;
+      ctx.textAlign = 'center';
+      wrapText(ctx, tipTitle.toUpperCase(), width / 2, 235, 960, 44);
+
+      // 2-Column Layout (Left: Shoe Photo Frame, Right: Infographic Tips Cards)
+      const contentY = 300;
+      const contentH = 430;
+
+      // Left Column: Photo Frame (Width 430)
+      const photoX = 60;
+      const photoW = 430;
+      drawRoundedRect(photoX, contentY, photoW, contentH, 20, 'rgba(30, 41, 59, 0.85)', accentGold, 2);
+
+      if (img1) {
+        ctx.save();
+        drawRoundedRect(photoX, contentY, photoW, contentH, 20);
+        ctx.clip();
+        drawCoverImage(ctx, img1, photoX, contentY, photoW, contentH);
+        
+        // Gradient overlay on photo bottom
+        const pGrad = ctx.createLinearGradient(photoX, contentY + contentH - 80, photoX, contentY + contentH);
+        pGrad.addColorStop(0, 'rgba(0,0,0,0)');
+        pGrad.addColorStop(1, 'rgba(15, 23, 42, 0.85)');
+        ctx.fillStyle = pGrad;
+        ctx.fillRect(photoX, contentY + contentH - 80, photoW, 80);
+        ctx.restore();
+
+        ctx.font = '600 18px "Segoe UI", sans-serif';
+        ctx.fillStyle = '#FFFFFF';
+        ctx.textAlign = 'center';
+        ctx.fillText('👟 HÌNH ẢNH MINH HỌA', photoX + photoW / 2, contentY + contentH - 25);
+      } else {
+        // Placeholder Graphic when no photo is uploaded
+        ctx.font = '54px "Segoe UI", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('👟', photoX + photoW / 2, contentY + 180);
+
+        ctx.font = 'bold 22px "Segoe UI", sans-serif';
+        ctx.fillStyle = '#E2E8F0';
+        ctx.fillText('ẢNH MINH HỌA GIÀY', photoX + photoW / 2, contentY + 250);
+
+        ctx.font = '16px "Segoe UI", sans-serif';
+        ctx.fillStyle = '#94A3B8';
+        ctx.fillText('Tải 1 ảnh giày lên để hiển thị ở đây', photoX + photoW / 2, contentY + 290);
+      }
+
+      // Right Column: Infographic Cards (Width 500)
+      const cardX = 520;
+      const cardW = 500;
+
+      // 1. Preparation Card
+      drawRoundedRect(cardX, contentY, cardW, 85, 14, 'rgba(245, 158, 11, 0.15)', '#F59E0B', 1);
+      ctx.font = 'bold 19px "Segoe UI", sans-serif';
+      ctx.fillStyle = '#F59E0B';
+      ctx.textAlign = 'left';
+      ctx.fillText('🧪 CHUẨN BỊ NGUYÊN LIỆU:', cardX + 20, contentY + 32);
+      ctx.font = '600 17px "Segoe UI", sans-serif';
+      ctx.fillStyle = '#E2E8F0';
+      wrapText(ctx, tipPrep, cardX + 20, contentY + 60, cardW - 40, 22);
+
+      // 2. Step 1 Card
+      drawRoundedRect(cardX, contentY + 105, cardW, 95, 14, 'rgba(255, 255, 255, 0.07)', 'rgba(255,255,255,0.15)', 1);
+      ctx.font = 'bold 19px "Segoe UI", sans-serif';
+      ctx.fillStyle = accentGold;
+      ctx.fillText('1️⃣ BƯỚC 1:', cardX + 20, contentY + 135);
+      ctx.font = '600 17px "Segoe UI", sans-serif';
+      ctx.fillStyle = '#FFFFFF';
+      wrapText(ctx, tipStep1, cardX + 20, contentY + 163, cardW - 40, 22);
+
+      // 3. Step 2 Card
+      drawRoundedRect(cardX, contentY + 218, cardW, 95, 14, 'rgba(255, 255, 255, 0.07)', 'rgba(255,255,255,0.15)', 1);
+      ctx.font = 'bold 19px "Segoe UI", sans-serif';
+      ctx.fillStyle = accentGold;
+      ctx.fillText('2️⃣ BƯỚC 2:', cardX + 20, contentY + 248);
+      ctx.font = '600 17px "Segoe UI", sans-serif';
+      ctx.fillStyle = '#FFFFFF';
+      wrapText(ctx, tipStep2, cardX + 20, contentY + 276, cardW - 40, 22);
+
+      // 4. Warning / Note Card
+      drawRoundedRect(cardX, contentY + 330, cardW, 95, 14, 'rgba(220, 38, 38, 0.18)', '#EF4444', 1);
+      ctx.font = 'bold 19px "Segoe UI", sans-serif';
+      ctx.fillStyle = '#EF4444';
+      ctx.fillText('⚠️ LƯU Ý QUAN TRỌNG:', cardX + 20, contentY + 360);
+      ctx.font = '600 17px "Segoe UI", sans-serif';
+      ctx.fillStyle = '#FECDD3';
+      wrapText(ctx, tipNote, cardX + 20, contentY + 388, cardW - 40, 22);
+    } else if (tpl === 'customer_feedback') {
+      // Layout 3: Customer Feedback Card Style
+      const photoW = 440, photoH = 660;
+      drawRoundedRect(60, 160, photoW, photoH, 20, 'rgba(0,0,0,0.3)', 'rgba(255,255,255,0.1)', 2);
+      if (img1) {
+        ctx.save();
+        drawRoundedRect(60, 160, photoW, photoH, 20);
+        ctx.clip();
+        drawCoverImage(ctx, img1, 60, 160, photoW, photoH);
+        ctx.restore();
+      }
+
+      // Right Feedback Text Box
+      const fbX = 530, fbY = 160, fbW = 490, fbH = 660;
+      drawRoundedRect(fbX, fbY, fbW, fbH, 20, 'rgba(255,255,255,0.08)', 'rgba(255,255,255,0.15)', 2);
+
+      // 5 Gold Stars
+      ctx.font = '36px "Segoe UI", sans-serif';
+      ctx.fillStyle = '#F59E0B';
+      ctx.textAlign = 'left';
+      ctx.fillText('★★★★★', fbX + 40, fbY + 70);
+
+      ctx.font = 'bold 30px "Segoe UI", sans-serif';
+      ctx.fillStyle = textColor;
+      ctx.fillText('FEEDBACK KHÁCH HÀNG', fbX + 40, fbY + 125);
+
+      ctx.font = 'italic 24px "Segoe UI", sans-serif';
+      ctx.fillStyle = subTextColor;
+      const quoteText = `"Giày gửi Spa về sạch bong như mới đập hộp, thơm phức luôn ạ! Cảm ơn ${storeName} nhiều nhé!"`;
+      wrapText(ctx, quoteText, fbX + 40, fbY + 180, fbW - 80, 36);
+
+      // Customer Info Tag
+      ctx.font = 'bold 24px "Segoe UI", sans-serif';
+      ctx.fillStyle = accentGold;
+      ctx.fillText(`— Khách hàng: ${custName}`, fbX + 40, fbY + 450);
+
+      ctx.font = '600 20px "Segoe UI", sans-serif';
+      ctx.fillStyle = textColor;
+      ctx.fillText(`👟 Hiệu giày: ${shoeInfo}`, fbX + 40, fbY + 500);
+      ctx.fillText(`🛠️ Dịch vụ: ${servicesText}`, fbX + 40, fbY + 540);
+
+    } else {
+      // Layout 4: High-Impact Professional Marketing Promo Banner Style
+      const isPromoPreset = (preset === 'promotion');
+      const promoTitle = isPromoPreset ? (document.getElementById('studio-shoe-info').value.trim() || 'CHƯƠNG TRÌNH KHUYẾN MẠI') : shoeInfo;
+      const promoTime = isPromoPreset ? (document.getElementById('studio-customer-name').value.trim() || 'Áp dụng số lượng có hạn') : custName;
+      const promoServices = servicesText || 'Vệ sinh & Phục hồi giày chuyên sâu';
+      const promoDiscount = priceText || 'GIẢM 20% | CHỈ TỪ 50K';
+      const promoTagline = notesText || 'Giày sạch kính kong đón hè cực chất cùng Phủi Bụi';
+
+      // Top Floating Badge: "🔥 CHƯƠNG TRÌNH KHUYẾN MẠI 🔥"
+      drawRoundedRect(width / 2 - 240, 140, 480, 48, 24, '#DC2626', '#EF4444', 2);
+      ctx.font = 'bold 22px "Segoe UI", sans-serif';
+      ctx.fillStyle = '#FFFFFF';
+      ctx.textAlign = 'center';
+      ctx.fillText('🔥 CHƯƠNG TRÌNH KHUYẾN MẠI 🔥', width / 2, 172);
+
+      // Main Campaign Title (Shifted down to Y = 255 to create comfortable spacing)
+      ctx.font = 'bold 42px "Segoe UI", sans-serif';
+      ctx.fillStyle = accentGold;
+      ctx.textAlign = 'center';
+      wrapText(ctx, promoTitle.toUpperCase(), width / 2, 255, 940, 48);
+
+      // Tagline / Subheadline
+      if (promoTagline) {
+        ctx.font = 'italic 600 24px "Segoe UI", sans-serif';
+        ctx.fillStyle = '#E2E8F0';
+        ctx.fillText(`" ${promoTagline} "`, width / 2, 318);
+      }
+
+      // Middle Hero Area (Photo OR Promo Graphics Card)
+      const heroY = promoTagline ? 342 : 320;
+      const heroH = 440;
+      const heroW = 940;
+      const heroX = (width - heroW) / 2;
+
+      if (img1) {
+        // Photo with glowing golden border
+        drawRoundedRect(heroX, heroY, heroW, heroH, 20, 'rgba(0,0,0,0.4)', accentGold, 3);
+        ctx.save();
+        drawRoundedRect(heroX, heroY, heroW, heroH, 20);
+        ctx.clip();
+        drawCoverImage(ctx, img1, heroX, heroY, heroW, heroH);
+        
+        // Linear gradient overlay on bottom of photo
+        const pGrad = ctx.createLinearGradient(heroX, heroY + heroH - 120, heroX, heroY + heroH);
+        pGrad.addColorStop(0, 'rgba(0,0,0,0)');
+        pGrad.addColorStop(1, 'rgba(15, 23, 42, 0.92)');
+        ctx.fillStyle = pGrad;
+        ctx.fillRect(heroX, heroY + heroH - 120, heroW, 120);
+        ctx.restore();
+
+        // Overlay Service Badge on photo
+        ctx.font = '600 22px "Segoe UI", sans-serif';
+        ctx.fillStyle = '#FFFFFF';
+        ctx.textAlign = 'left';
+        ctx.fillText(`👉 ${promoServices}`, heroX + 30, heroY + heroH - 35);
+      } else {
+        // Graphic Card Frame (when no photo is uploaded)
+        drawRoundedRect(heroX, heroY, heroW, heroH, 20, 'rgba(30, 41, 59, 0.85)', 'rgba(234, 179, 8, 0.4)', 2);
+        
+        ctx.font = 'bold 36px "Segoe UI", sans-serif';
+        ctx.fillStyle = '#FFFFFF';
+        ctx.textAlign = 'center';
+        ctx.fillText('⚡ ƯU ĐÃI ĐẶC BIỆT DÀNH CHO BẠN ⚡', width / 2, heroY + 140);
+
+        ctx.font = '600 28px "Segoe UI", sans-serif';
+        ctx.fillStyle = accentGold;
+        ctx.fillText(`✨ ${promoServices}`, width / 2, heroY + 230);
+
+        if (promoTime) {
+          ctx.font = '24px "Segoe UI", sans-serif';
+          ctx.fillStyle = '#94A3B8';
+          ctx.fillText(`⏰ ${promoTime}`, width / 2, heroY + 310);
+        }
+      }
+
+      // Bottom Highlight Callout Pill: "GIẢM 20% - CHỈ TỪ 50.000đ"
+      const pillY = heroY + heroH + 25;
+      const pillW = 760;
+      const pillX = (width - pillW) / 2;
+      drawRoundedRect(pillX, pillY, pillW, 85, 42, '#EAB308', '#FACC15', 2);
+
+      ctx.font = 'bold 36px "Segoe UI", sans-serif';
+      ctx.fillStyle = '#0F172A';
+      ctx.textAlign = 'center';
+      ctx.fillText(promoDiscount.toUpperCase(), width / 2, pillY + 54);
+    }
+
+    // 3. FOOTER (Hotline & Address - Professional Monochromatic Vector Styling)
+    if (showHotline) {
+      const footerH = 95;
+      const footerY = height - footerH;
+
+      // Dark luxury container bar matching theme background tone
+      ctx.fillStyle = 'rgba(10, 15, 26, 0.92)';
+      ctx.fillRect(0, footerY, width, footerH);
+
+      // Top subtle border line
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(0, footerY);
+      ctx.lineTo(width, footerY);
+      ctx.stroke();
+
+      const centerY = footerY + footerH / 2;
+
+      // Left: Vector Phone Icon + Hotline/Zalo Text
+      const phoneIconX = 65;
+      drawVectorIconPhone(ctx, phoneIconX, centerY, 34, accentGold);
+
+      ctx.font = 'bold 22px "Segoe UI", sans-serif';
+      ctx.fillStyle = accentGold;
+      ctx.textAlign = 'left';
+      ctx.fillText(`HOTLINE / ZALO: ${hotline}`, phoneIconX + 26, centerY + 7);
+
+      // Right: Vector Pin Icon + Address Text
+      const pinIconX = width - 440;
+      drawVectorIconPin(ctx, pinIconX, centerY, 34, '#E2E8F0');
+
+      ctx.font = '600 18px "Segoe UI", sans-serif';
+      ctx.fillStyle = '#E2E8F0';
+      ctx.textAlign = 'left';
+      
+      let displayAddress = address;
+      if (displayAddress.length > 38) {
+        displayAddress = displayAddress.substring(0, 36) + '...';
+      }
+      ctx.fillText(displayAddress, pinIconX + 26, centerY + 6);
+    }
+
+  });
+}
+
+function drawVectorIconPhone(ctx, x, y, size, color) {
+  ctx.save();
+  ctx.translate(x, y);
+  
+  // Solid Circle Badge Background
+  ctx.beginPath();
+  ctx.arc(0, 0, size / 2, 0, Math.PI * 2);
+  ctx.fillStyle = color;
+  ctx.fill();
+
+  // Contrast Inner Color (Dark Theme background)
+  const innerColor = 'rgba(15, 23, 42, 0.95)';
+  ctx.fillStyle = innerColor;
+  ctx.strokeStyle = innerColor;
+  ctx.lineWidth = 2.2;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  // 1. Tilted Phone Handset Silhouette
+  ctx.beginPath();
+  ctx.moveTo(-7, -4);
+  ctx.lineTo(-4, -8);
+  ctx.lineTo(-1, -5);
+  ctx.lineTo(-2, -3);
+  ctx.quadraticCurveTo(0, 1, 3, 2);
+  ctx.lineTo(5, 0);
+  ctx.lineTo(8, 3);
+  ctx.lineTo(6, 7);
+  ctx.quadraticCurveTo(0, 9, -6, 3);
+  ctx.quadraticCurveTo(-9, -2, -7, -4);
+  ctx.closePath();
+  ctx.fill();
+
+  // 2. Sound Waves (2 concentric ringing arcs emitting to top-right)
+  ctx.beginPath();
+  ctx.arc(-1, -1, 7, -Math.PI * 0.38, 0);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(-1, -1, 11, -Math.PI * 0.38, 0);
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+function drawVectorIconPin(ctx, x, y, size, color) {
+  ctx.save();
+  ctx.translate(x, y);
+
+  // Solid Circle Badge Background
+  ctx.beginPath();
+  ctx.arc(0, 0, size / 2, 0, Math.PI * 2);
+  ctx.fillStyle = color;
+  ctx.fill();
+
+  const innerColor = 'rgba(15, 23, 42, 0.95)';
+  ctx.fillStyle = innerColor;
+  ctx.strokeStyle = innerColor;
+  ctx.lineWidth = 2;
+
+  // Clean Pin Silhouette
+  ctx.beginPath();
+  ctx.arc(0, -3, 4.5, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.moveTo(-4.5, -2);
+  ctx.lineTo(0, 7.5);
+  ctx.lineTo(4.5, -2);
+  ctx.closePath();
+  ctx.fill();
+
+  // Inner cutout hole in pin head
+  ctx.beginPath();
+  ctx.arc(0, -3, 2, 0, Math.PI * 2);
+  ctx.fillStyle = color;
+  ctx.fill();
+
+  ctx.restore();
+}
+
+function drawCoverImage(ctx, img, x, y, w, h) {
+  const imgRatio = img.width / img.height;
+  const rectRatio = w / h;
+  let sw, sh, sx, sy;
+
+  if (imgRatio > rectRatio) {
+    sh = img.height;
+    sw = img.height * rectRatio;
+    sx = (img.width - sw) / 2;
+    sy = 0;
+  } else {
+    sw = img.width;
+    sh = img.width / rectRatio;
+    sx = 0;
+    sy = (img.height - sh) / 2;
+  }
+  ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h);
+}
+
+function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
+  const words = text.split(' ');
+  let line = '';
+  for (let n = 0; n < words.length; n++) {
+    const testLine = line + words[n] + ' ';
+    const metrics = ctx.measureText(testLine);
+    const testWidth = metrics.width;
+    if (testWidth > maxWidth && n > 0) {
+      ctx.fillText(line, x, y);
+      line = words[n] + ' ';
+      y += lineHeight;
+    } else {
+      line = testLine;
+    }
+  }
+  ctx.fillText(line, x, y);
+}
+
+function downloadStudioCanvasImage() {
+  const canvas = document.getElementById('content-studio-canvas');
+  if (!canvas) return;
+
+  const dataUrl = canvas.toDataURL('image/png');
+  const link = document.createElement('a');
+  link.download = `fanpage-content-${Date.now()}.png`;
+  link.href = dataUrl;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  showToast('Đã tải ảnh HD thành công!');
+}
+
+function copyStudioCanvasImage() {
+  const canvas = document.getElementById('content-studio-canvas');
+  if (!canvas) return;
+
+  try {
+    canvas.toBlob(blob => {
+      if (!blob) {
+        showToast('Không thể tạo blob ảnh!');
+        return;
+      }
+      if (navigator.clipboard && window.ClipboardItem) {
+        const item = new ClipboardItem({ 'image/png': blob });
+        navigator.clipboard.write([item]).then(() => {
+          showToast('Đã sao chép ảnh vào bộ nhớ tạm!');
+        }).catch(err => {
+          console.error('Copy canvas image failed:', err);
+          showToast('Trình duyệt không hỗ trợ copy trực tiếp. Hãy dùng nút Tải Ảnh!');
+        });
+      } else {
+        showToast('Trình duyệt không hỗ trợ copy trực tiếp. Hãy dùng nút Tải Ảnh!');
+      }
+    }, 'image/png');
+  } catch (e) {
+    console.error('Error copying canvas image:', e);
+    showToast('Hãy dùng nút Tải Ảnh về máy!');
+  }
+}
+
+async function publishToFacebookFanpage() {
+  const info = state.storeInfo || window.DEFAULT_STORE_INFO || {};
+  const fbPageId = (info.fbPageId || '').trim();
+  const fbPageToken = (info.fbPageToken || '').trim();
+
+  if (!fbPageId || !fbPageToken) {
+    alert('⚠️ CHƯA CẤU HÌNH FACEBOOK FANPAGE:\n\nBạn chưa điền Facebook Page ID hoặc Page Access Token.\n\nVui lòng vào menu "Thông tin cửa hàng" > cuộn xuống mục "Cấu hình Đăng bài Tự Động lên Facebook Fanpage" để điền ID và Token trước khi thực hiện!');
+    switchView('store-settings');
+    return;
+  }
+
+  const captionText = document.getElementById('studio-caption-output').value.trim();
+  if (!captionText) {
+    alert('Vui lòng tạo hoặc nhập bài viết trước khi đăng!');
+    return;
+  }
+
+  const canvas = document.getElementById('content-studio-canvas');
+  if (!canvas) {
+    alert('Không tìm thấy khung ảnh Canvas!');
+    return;
+  }
+
+  const btn = document.getElementById('btn-publish-fb');
+  const originalBtnText = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = `<span style="display:inline-block; animation: spin 1s linear infinite; margin-right:6px;">⏳</span>Đang đăng bài lên Facebook Fanpage...`;
+
+  try {
+    // 1. Tự động kiểm tra & đổi từ Mã người dùng (User Token) sang Mã Trang (Page Access Token) chuẩn Facebook
+    let effectivePageToken = fbPageToken;
+    let targetPageId = fbPageId;
+
+    try {
+      // Thử lấy trực tiếp Page Access Token của Page ID
+      const pageRes = await fetch(`https://graph.facebook.com/v19.0/${fbPageId}?fields=access_token,name&access_token=${fbPageToken}`);
+      const pageData = await pageRes.json();
+      if (pageData && pageData.access_token) {
+        effectivePageToken = pageData.access_token;
+        console.log("Đã tự động lấy Page Token chuẩn cho Trang:", pageData.name);
+      } else {
+        // Dự phòng: Lấy danh sách trang qua me/accounts
+        const accountsRes = await fetch(`https://graph.facebook.com/v19.0/me/accounts?access_token=${fbPageToken}`);
+        const accountsData = await accountsRes.json();
+        if (accountsData && accountsData.data && accountsData.data.length > 0) {
+          const matchedPage = accountsData.data.find(p => p.id === fbPageId) || accountsData.data[0];
+          if (matchedPage && matchedPage.access_token) {
+            effectivePageToken = matchedPage.access_token;
+            if (!targetPageId) targetPageId = matchedPage.id;
+            console.log("Đã lấy thành công Page Access Token từ me/accounts:", matchedPage.name);
+          }
+        }
+      }
+    } catch (tokenErr) {
+      console.warn("Không thể tự chuyển đổi Token, sẽ thử đăng bằng Token hiện tại:", tokenErr);
+    }
+
+    // 2. Convert Canvas image to Blob
+    const blob = await new Promise((resolve, reject) => {
+      canvas.toBlob(b => b ? resolve(b) : reject(new Error('Không thể chuyển đổi canvas sang blob ảnh')), 'image/png');
+    });
+
+    // 3. Build FormData request payload for Meta Graph API
+    const formData = new FormData();
+    formData.append('access_token', effectivePageToken);
+    formData.append('caption', captionText);
+    formData.append('source', blob, `spa-giay-post-${Date.now()}.png`);
+
+    // 4. Post to Facebook Page API endpoint
+    const response = await fetch(`https://graph.facebook.com/v19.0/${targetPageId}/photos`, {
+      method: 'POST',
+      body: formData
+    });
+
+    const result = await response.json();
+
+    if (response.ok && (result.id || result.post_id)) {
+      const postId = result.post_id || result.id;
+      showToast('🎉 Đã đăng bài tự động lên Facebook Fanpage thành công!');
+      alert(`🎉 ĐÃ ĐĂNG BÀI THÀNH CÔNG LÊN FANPAGE!\n\nID Bài đăng Facebook: ${postId}\n\nQuý khách có thể vào Fanpage kiểm tra bài viết vừa đăng.`);
+    } else {
+      console.error("Facebook API Error response:", result);
+      const errorMsg = result.error ? (result.error.message || JSON.stringify(result.error)) : 'Lỗi không xác định';
+      alert(`⚠️ KHÔNG THỂ ĐĂNG BÀI LÊN FANPAGE:\n\nLỗi từ Facebook: ${errorMsg}\n\nVui lòng kiểm tra lại Page Access Token hoặc cấp quyền pages_manage_posts cho Token.`);
+    }
+  } catch (err) {
+    console.error("Lỗi khi kết nối Facebook Graph API:", err);
+    alert(`⚠️ LỖI KẾT NỐI FACEBOOK GRAPH API:\n\nChi tiết lỗi: ${err.message}`);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = originalBtnText;
+  }
+}
+
+// ==========================================
+// 12. EXPENSES MANAGEMENT MODULE
+// ==========================================
+const EXPENSE_CATEGORIES = {
+  rent: { name: '🏢 Mặt bằng / Cửa hàng', color: '#F59E0B', bg: 'rgba(245, 158, 11, 0.15)' },
+  salaries: { name: '👥 Lương nhân viên & Phụ cấp', color: '#3B82F6', bg: 'rgba(59, 130, 246, 0.15)' },
+  supplies: { name: '🧼 Dung dịch, Hóa chất & Vật tư', color: '#10B981', bg: 'rgba(16, 185, 129, 0.15)' },
+  utilities: { name: '⚡ Điện, Nước & Internet', color: '#8B5CF6', bg: 'rgba(139, 92, 246, 0.15)' },
+  marketing: { name: '📢 Quảng cáo & Marketing', color: '#EC4899', bg: 'rgba(236, 72, 153, 0.15)' },
+  other: { name: '📦 Chi phí khác', color: '#6B7280', bg: 'rgba(107, 114, 128, 0.15)' }
+};
+
+function renderExpenses() {
+  const tbody = document.getElementById('expenses-table-body');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+
+  const monthFilter = document.getElementById('exp-filter-month') ? document.getElementById('exp-filter-month').value : 'all';
+  const yearFilter = document.getElementById('exp-filter-year') ? document.getElementById('exp-filter-year').value : 'all';
+  const catFilter = document.getElementById('exp-filter-category') ? document.getElementById('exp-filter-category').value : 'all';
+
+  let filtered = state.expenses || [];
+
+  // Filter by date (month/year)
+  filtered = filtered.filter(e => isDateMatch(e.date, null, monthFilter, yearFilter));
+
+  // Filter by category
+  if (catFilter !== 'all') {
+    filtered = filtered.filter(e => e.category === catFilter);
+  }
+
+  // Sort newest first
+  filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  // Update Summary Stats
+  const totalAmount = filtered.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+  const rentUtilAmount = filtered.filter(e => e.category === 'rent' || e.category === 'utilities').reduce((sum, e) => sum + Number(e.amount || 0), 0);
+  const salariesAmount = filtered.filter(e => e.category === 'salaries').reduce((sum, e) => sum + Number(e.amount || 0), 0);
+  const suppliesOtherAmount = filtered.filter(e => e.category === 'supplies' || e.category === 'marketing' || e.category === 'other').reduce((sum, e) => sum + Number(e.amount || 0), 0);
+
+  const statTotal = document.getElementById('exp-stat-total');
+  if (statTotal) statTotal.textContent = formatVND(totalAmount);
+  const statRU = document.getElementById('exp-stat-rent-utilities');
+  if (statRU) statRU.textContent = formatVND(rentUtilAmount);
+  const statSal = document.getElementById('exp-stat-salaries');
+  if (statSal) statSal.textContent = formatVND(salariesAmount);
+  const statSO = document.getElementById('exp-stat-supplies-other');
+  if (statSO) statSO.textContent = formatVND(suppliesOtherAmount);
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7" class="text-center" style="padding: 30px; color: var(--text-light);">Không tìm thấy khoản chi phí nào</td></tr>`;
+    return;
+  }
+
+  filtered.forEach(exp => {
+    const tr = document.createElement('tr');
+
+    const catMeta = EXPENSE_CATEGORIES[exp.category] || { name: exp.categoryName || 'Chi phí khác', color: '#6B7280', bg: 'rgba(107, 114, 128, 0.15)' };
+
+    tr.innerHTML = `
+      <td style="font-weight: 700; color: var(--color-brand-brown-dark);">${exp.id}</td>
+      <td style="white-space: nowrap;">${formatDateTime(exp.date).split(' ')[0]}</td>
+      <td>
+        <span class="badge" style="background-color: ${catMeta.bg}; color: ${catMeta.color}; font-weight: 600; padding: 4px 10px; border-radius: 12px;">
+          ${catMeta.name}
+        </span>
+      </td>
+      <td>
+        <div style="font-weight: 600; max-width: 280px;">${exp.description}</div>
+      </td>
+      <td style="font-weight: 700; color: #EF4444;">${formatVND(exp.amount)}</td>
+      <td style="font-size: 0.85rem; color: var(--text-secondary);">${exp.creator || 'Admin'}</td>
+      <td style="text-align: right; white-space: nowrap;">
+        <button class="action-btn edit" onclick="openExpenseModal('${exp.id}')" title="Sửa khoản chi">
+          <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+        </button>
+        <button class="action-btn delete" onclick="deleteExpense('${exp.id}')" title="Xóa khoản chi">
+          <svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+        </button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function resetExpenseFilters() {
+  if (document.getElementById('exp-filter-month')) document.getElementById('exp-filter-month').value = 'all';
+  if (document.getElementById('exp-filter-year')) document.getElementById('exp-filter-year').value = 'all';
+  if (document.getElementById('exp-filter-category')) document.getElementById('exp-filter-category').value = 'all';
+  renderExpenses();
+}
+
+function openExpenseModal(expId = null) {
+  const modal = document.getElementById('expense-modal');
+  const title = document.getElementById('expense-modal-title');
+  const submitBtn = document.getElementById('expense-submit-btn');
+
+  if (expId) {
+    const exp = (state.expenses || []).find(e => e.id === expId);
+    if (!exp) return;
+    state.currentEditingExpense = exp;
+    title.textContent = 'Chỉnh Sửa Khoản Chi';
+    submitBtn.textContent = 'Cập nhật khoản chi';
+
+    document.getElementById('exp-id').value = exp.id;
+    document.getElementById('exp-date').value = exp.date;
+    document.getElementById('exp-category').value = exp.category;
+    document.getElementById('exp-amount').value = exp.amount;
+    document.getElementById('exp-description').value = exp.description;
+  } else {
+    state.currentEditingExpense = null;
+    title.textContent = 'Thêm Khoản Chi Mới';
+    submitBtn.textContent = 'Lưu khoản chi';
+
+    document.getElementById('exp-id').value = '';
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('exp-date').value = today;
+    document.getElementById('exp-category').value = 'rent';
+    document.getElementById('exp-amount').value = '';
+    document.getElementById('exp-description').value = '';
+  }
+
+  modal.classList.add('active');
+}
+
+function closeExpenseModal() {
+  const modal = document.getElementById('expense-modal');
+  if (modal) modal.classList.remove('active');
+  state.currentEditingExpense = null;
+}
+
+async function handleExpenseSubmit(event) {
+  event.preventDefault();
+
+  const id = document.getElementById('exp-id').value.trim();
+  const date = document.getElementById('exp-date').value;
+  const category = document.getElementById('exp-category').value;
+  const amount = Number(document.getElementById('exp-amount').value);
+  const description = document.getElementById('exp-description').value.trim();
+
+  if (!date || !amount || amount <= 0 || !description) {
+    alert('Vui lòng nhập đầy đủ và chính xác thông tin khoản chi!');
+    return;
+  }
+
+  const catMeta = EXPENSE_CATEGORIES[category] || { name: 'Chi phí khác' };
+  const creator = state.currentUser ? state.currentUser.name : 'Admin';
+
+  let expObj;
+
+  if (id) {
+    // Edit existing expense
+    const existing = state.expenses.find(e => e.id === id);
+    if (existing) {
+      existing.date = date;
+      existing.category = category;
+      existing.categoryName = catMeta.name;
+      existing.amount = amount;
+      existing.description = description;
+      existing.updatedAt = new Date().toISOString();
+      expObj = existing;
+    }
+  } else {
+    // Create new expense
+    const newId = 'EXP-' + String(Date.now()).slice(-6);
+    expObj = {
+      id: newId,
+      date: date,
+      category: category,
+      categoryName: catMeta.name,
+      amount: amount,
+      description: description,
+      creator: creator,
+      createdAt: new Date().toISOString()
+    };
+    state.expenses.push(expObj);
+  }
+
+  // Save to localStorage
+  saveState('pb_v2_expenses', state.expenses);
+
+  // Sync to Firebase Cloud V2 if available
+  if (window.db && expObj) {
+    try {
+      await window.db.collection('v2_expenses').doc(expObj.id).set(expObj);
+      console.log(`Synced expense ${expObj.id} to Firebase Cloud V2.`);
+    } catch (e) {
+      console.error("Error syncing expense to Firebase V2:", e);
+    }
+  }
+
+  closeExpenseModal();
+  renderExpenses();
+  renderDashboard();
+  showToast(id ? 'Cập nhật khoản chi thành công!' : 'Đã thêm khoản chi mới thành công!');
+}
+
+async function deleteExpense(expId) {
+  if (!confirm('Bạn có chắc chắn muốn xóa khoản chi phí này?')) return;
+
+  state.expenses = state.expenses.filter(e => e.id !== expId);
+  saveState('pb_v2_expenses', state.expenses);
+
+  if (window.db) {
+    try {
+      await window.db.collection('v2_expenses').doc(expId).delete();
+      console.log(`Deleted expense ${expId} from Firebase Cloud V2.`);
+    } catch (e) {
+      console.error("Error deleting expense from Firebase V2:", e);
+    }
+  }
+
+  renderExpenses();
+  renderDashboard();
+  showToast('Đã xóa khoản chi phí thành công!');
+}
+
+
