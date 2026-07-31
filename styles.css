@@ -2082,6 +2082,13 @@ body {
   line-height: 1.1;
 }
 
+.tpl-framed-box {
+  background: linear-gradient(135deg, #1E293B, #0F172A);
+  border: 1px dashed var(--color-brand-gold);
+  flex-direction: column;
+  line-height: 1.1;
+}
+
 .tpl-title {
   font-size: 0.75rem;
   font-weight: 700;

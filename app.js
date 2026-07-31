@@ -2781,14 +2781,16 @@ const PRESET_TO_GFX_MAP = {
   'price_service': 'showcase_badge',
   'feedback': 'customer_feedback',
   'promotion': 'promo_banner',
-  'story': 'showcase_badge'
+  'story': 'showcase_badge',
+  'simple_framed': 'simple_framed'
 };
 
 const GFX_TO_PRESET_MAP = {
   'before_after_split': 'before_after',
   'showcase_badge': 'tips',
   'customer_feedback': 'feedback',
-  'promo_banner': 'promotion'
+  'promo_banner': 'promotion',
+  'simple_framed': 'simple_framed'
 };
 
 function selectPresetTemplate(btn, skipSync = false) {
@@ -2926,6 +2928,13 @@ function generateFanpageCaption() {
     caption += `💥 GIÁ ƯU ĐÃI: ${promoPrice}\n`;
     caption += `⏰ THỜI GIAN ÁP DỤNG: ${promoTime}\n\n`;
     caption += `👉 Nhanh tay Inbox Fanpage hoặc liên hệ Hotline để đăng ký giữ suất ưu đãi ngay hôm nay nhé!\n\n`;
+  } else if (preset === 'simple_framed') {
+    caption += `✨ ${shoeInfo.toUpperCase()} - SPA & CHĂM SÓC GIÀY TẠI ${storeName.toUpperCase()} ✨\n\n`;
+    caption += `Gửi tới quý khách hàng hình ảnh thực tế từ workshop của ${storeName}.\n\n`;
+    if (servicesText) caption += `📌 Dịch vụ thực hiện: ${servicesText}\n`;
+    if (priceText) caption += `💸 Chi phí trọn gói: ${priceText}\n`;
+    if (notesText) caption += `🔍 Ghi chú tình trạng: ${notesText}\n\n`;
+    caption += `Ghé ngay ${storeName} để đôi giày yêu thích của bạn được chăm sóc chuẩn Spa tốt nhất nhé! 💙\n\n`;
   } else { // story
     caption += `🛠️ HÀNH TRÌNH PHỤC HỒI ĐÔI ${shoeInfo.toUpperCase()} TỈ MỈ TẠI WORKSHOP 🎨\n\n`;
     caption += `Khi tiếp nhận đôi ${shoeInfo}, chúng tôi hiểu rằng đây là món đồ gắn liền với nhiều kỷ niệm của chủ nhân.\n\n`;
@@ -3326,6 +3335,59 @@ function renderContentCanvas() {
       ctx.fillStyle = textColor;
       ctx.fillText(`👟 Hiệu giày: ${shoeInfo}`, fbX + 40, fbY + 500);
       ctx.fillText(`🛠️ Dịch vụ: ${servicesText}`, fbX + 40, fbY + 540);
+
+    } else if (tpl === 'simple_framed') {
+      // Layout 5: Single Image Frame with Store Logo, Store Name, Hotline & Address
+      const heroX = 50;
+      const heroY = 150;
+      const heroW = width - (heroX * 2);
+      const heroH = 750;
+      const borderRadius = 20;
+
+      // Outer frame outline with accent color
+      drawRoundedRect(heroX, heroY, heroW, heroH, borderRadius, 'rgba(15, 23, 42, 0.6)', accentGold, 3);
+
+      if (img1) {
+        ctx.save();
+        drawRoundedRect(heroX, heroY, heroW, heroH, borderRadius);
+        ctx.clip();
+        drawCoverImage(ctx, img1, heroX, heroY, heroW, heroH);
+
+        // Bottom subtle gradient overlay inside image
+        const pGrad = ctx.createLinearGradient(heroX, heroY + heroH - 120, heroX, heroY + heroH);
+        pGrad.addColorStop(0, 'rgba(0,0,0,0)');
+        pGrad.addColorStop(1, 'rgba(15, 23, 42, 0.85)');
+        ctx.fillStyle = pGrad;
+        ctx.fillRect(heroX, heroY + heroH - 120, heroW, 120);
+        ctx.restore();
+
+        // Overlay Label on Photo if shoeInfo or service text exists
+        if (shoeInfo && shoeInfo !== 'SHOE SPA REPAIR') {
+          ctx.font = 'bold 26px "Segoe UI", sans-serif';
+          ctx.fillStyle = '#FFFFFF';
+          ctx.textAlign = 'left';
+          ctx.fillText(shoeInfo.toUpperCase(), heroX + 30, heroY + heroH - 45);
+
+          if (servicesText) {
+            ctx.font = '600 20px "Segoe UI", sans-serif';
+            ctx.fillStyle = accentGold;
+            ctx.fillText(`• Dịch vụ: ${servicesText}`, heroX + 30, heroY + heroH - 16);
+          }
+        }
+      } else {
+        // Placeholder graphic if no photo selected yet
+        ctx.font = '64px "Segoe UI", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('🖼️', width / 2, heroY + 300);
+
+        ctx.font = 'bold 30px "Segoe UI", sans-serif';
+        ctx.fillStyle = '#E2E8F0';
+        ctx.fillText('KHUNG ÁNH THƯƠNG HIỆU', width / 2, heroY + 390);
+
+        ctx.font = '18px "Segoe UI", sans-serif';
+        ctx.fillStyle = '#94A3B8';
+        ctx.fillText('Chọn hoặc tải 1 ảnh sản phẩm / dịch vụ để hiển thị vào khung', width / 2, heroY + 430);
+      }
 
     } else {
       // Layout 4: High-Impact Professional Marketing Promo Banner Style
